@@ -5,7 +5,7 @@
 
 #include "cJSON.h"
 
-#define MAX_LINE 12800
+#define MAX_LINE 64000
 
 CURLcode res;
 CURL *curl_handle;
@@ -22,9 +22,8 @@ size_t write_data(void *ptr, long unsigned int size, long unsigned int nmemb, vo
 
 char *down_file(char *url_address)
 {
-    static char str[MAX_LINE];
+    static unsigned char str[MAX_LINE] = {""};
     char *p2s;
-    strcpy(str, "");
     
     /* set the download address */
     curl_easy_setopt(curl_handle, CURLOPT_URL, url_address);
@@ -40,11 +39,6 @@ char *down_file(char *url_address)
     /* download */
     res = curl_easy_perform(curl_handle);
     //str[MAX_LINE-1] = "\0";
-    for (static int i = 0; i < strlen(str); i ++)
-    {
-        p2s = &str[i];
-        if (*p2s != "\0")
-    }
     if(res != CURLE_OK)
     {
         fprintf(stderr, "curl_easy_perform() failed: %s\n", curl_easy_strerror(res));
@@ -65,6 +59,11 @@ int main(int argc, char *argv[])
     char *one_result;
     char *one_json;
     
+    cJSON *elem;
+    cJSON *id;
+    cJSON *date;
+    cJSON *name;
+    
     /* init the curl */
     curl_handle = curl_easy_init();
     
@@ -80,37 +79,24 @@ int main(int argc, char *argv[])
         {
             /* deal with the JSON data */
             /* [{"id":"19952","date":"2014-10-10","name":"WordPress Google Calendar Events 2.0.1 Cross Site Scripting"}, ...] */
-            cJSON *root = NULL;
-            
+            cJSON *root;
             root = cJSON_Parse(result);
-            if (root == NULL)
+            if (root != NULL)
             {
-                printf("Get root failed\n");
-                exit(1);
-            }
-            cJSON *id = cJSON_GetObjectItem(root, "id");
-            
-            if (!id)
-            {
-                printf("Can't get id\n");
-                exit(1);
-            }
-            cJSON *date = cJSON_GetObjectItem(root, "date");
-            if (!date)
-            {
-                printf("Can't get date\n");
-                exit(1);
-            }
-            cJSON *name = cJSON_GetObjectItem(root, "name");
-            if (!name)
-            {
-                printf("Can't get name\n");
-                exit(1);
-            }
-            printf("%s %s %s\n", id->valuestring, date->valuestring, name->valuestring);
-            
-            if (root)
-            {
+                int n = cJSON_GetArraySize(root);
+                
+                for (i = 0; i < n; i++)
+                {
+                    elem = cJSON_GetArrayItem(root, i);
+                    
+                    id = cJSON_GetObjectItem(elem, "id");
+                    
+                    date = cJSON_GetObjectItem(elem, "date");
+                    
+                    name = cJSON_GetObjectItem(elem, "name");
+                    
+                    printf("%s | %s | %s\n", id-> valuestring, date->valuestring, name->valuestring);
+                }
                 cJSON_Delete(root);
             }
         }
