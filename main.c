@@ -186,7 +186,7 @@ int main(int argc, char *argv[])
     {
         if (remove(SPLIT_FILE) == 0)
         {
-            printf("END");
+            printf("END\n");
         }
     }
     return 0;
