@@ -41,6 +41,7 @@ NUML NUMC | DATE       | DETAIL
 >[12] 7878 | 2009-08-19 | Discuz! Remote Reset User Password Exploit
 >[13] 7879 | 2009-08-19 | Discuz! 6.x/7.x Remote Code Execution Exploit
 >[14] 10534 | 2008-08-07 | Comsenz Discuz! 6.0.1 Sql injection
+END
 ```
 
 ## NOTE:
