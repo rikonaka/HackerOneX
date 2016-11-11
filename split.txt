@@ -1,7 +1,0 @@
-{"id":"6792","date":"2010-01-29","name":"Discuz! 6.0.0 cross site scripting"}
-{"id":"7570","date":"2009-09-17","name":"Discuz! Plugin Crazy Star <= 2.0 (fmid) SQL Injection Vulnerability"}
-{"id":"7619","date":"2009-09-15","name":"Discuz! JiangHu plugin versions 1.1 and below remote SQL injection"}
-{"id":"7779","date":"2009-08-25","name":"Discuz 6.0 (2fly_gift.php) Sql Injection Vulnerability"}
-{"id":"7878","date":"2009-08-19","name":"Discuz! Remote Reset User Password Exploit"}
-{"id":"7879","date":"2009-08-19","name":"Discuz! 6.x\/7.x Remote Code Execution Exploit"}
-{"id":"10534","date":"2008-08-07","name":"Comsenz Discuz! 6.0.1 Sql injection"}

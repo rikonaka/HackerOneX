@@ -94,7 +94,7 @@ char *down_file(char *url_address)
     /* set the user-agent field */
     curl_easy_setopt(curl_handle, CURLOPT_WRITEFUNCTION, write_data);
     /* set the wirte variable */
-    curl_easy_setopt(curl_handle, CURLOPT_USERAGENT, "SVF-libcurl-agent/1.0");
+    curl_easy_setopt(curl_handle, CURLOPT_USERAGENT, "SVF-libcurl-agent/1.1");
     
     /* download */
     res = curl_easy_perform(curl_handle);
@@ -162,7 +162,7 @@ int main(int argc, char *argv[])
             if (splitres == 0)
             {
                 printf("NOW LIST THE ALL RESULT:\n");
-                printf("NUML NUMC | DATE | DETAIL\n");
+                printf("NUML NUMC | DATE       | DETAIL\n");
                 splitfp = fopen(SPLIT_FILE, "r");
                 int count = 1;
                 while (fgets(everyline, 1024, splitfp) != NULL)
