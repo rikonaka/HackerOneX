@@ -1,3 +1,4 @@
+use ctrlc;
 use md5;
 use serde::{Deserialize, Serialize};
 use std::fs::metadata;
@@ -6,21 +7,25 @@ use std::io::BufReader;
 use std::io::Read;
 use std::io::Write;
 use std::path::Path;
+use std::sync::mpsc::channel;
+use std::{thread, time};
 use walkdir::WalkDir;
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 struct FileInfo {
     id: usize,
     path: String,
     hash: Vec<u8>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Clone, Debug, Serialize, Deserialize)]
 struct FilesInfo {
     list: Vec<FileInfo>,
 }
 
-pub fn run(target_path: &str) {
+const DB_FILE: &str = "filestag.db";
+
+fn walk_files(target_path: &str) -> Vec<FileInfo> {
     let mut path_list: Vec<String> = Vec::new();
     for entry in WalkDir::new(target_path).into_iter().filter_map(|e| e.ok()) {
         // println!("{}", entry.path().display());
@@ -50,15 +55,62 @@ pub fn run(target_path: &str) {
             _ => (),
         }
     }
-    let filesinfo = FilesInfo {
-        list: fileinfo_list,
-    };
+    fileinfo_list
+}
 
-    // println!("{}", serde_json::to_string(&filesinfo).unwrap());
-    let mut file = match Path::new("filestag.db").exists() {
-        true => File::open("foo.txt").unwrap(),
-        _ => File::create("foo.txt").unwrap(),
+fn save_db(filesinfo: FilesInfo) {
+    let mut file = match Path::new(DB_FILE).exists() {
+        true => File::open(DB_FILE).unwrap(),
+        _ => File::create(DB_FILE).unwrap(),
     };
+    // println!("{}", serde_json::to_string(&filesinfo).unwrap());
     file.write_all(&serde_json::to_vec(&filesinfo).unwrap())
         .unwrap();
+}
+
+fn load_db() -> Option<FilesInfo> {
+    match Path::new(DB_FILE).exists() {
+        true => {
+            let f = File::open(DB_FILE).unwrap();
+            let mut reader = BufReader::new(f);
+            let mut buffer = Vec::new();
+            reader.read_to_end(&mut buffer).unwrap();
+
+            let filesinfo: FilesInfo = serde_json::from_slice(&buffer).unwrap();
+            // println!("{:?}", new_filesinfo);
+            Some(filesinfo)
+        }
+        _ => None,
+    }
+}
+
+pub fn run(target_path: &str, delay: f32) {
+    let delay_duration = time::Duration::from_secs_f32(delay);
+    let (tx, rx) = channel();
+    ctrlc::set_handler(move || tx.send(()).expect("Could not send signal on channel."))
+        .expect("Error setting Ctrl-C handler");
+
+    let mut saved_filesinfo = load_db();
+    loop {
+        let fileinfo_list = walk_files(target_path);
+        match saved_filesinfo {
+            Some(fsi) => {
+                let saved_fileinfo_list = fsi.list;
+            },
+            _ => {
+                saved_filesinfo = Some(FilesInfo{list: fileinfo_list.clone()});
+            }
+        }
+        match rx.recv() {
+            Ok(_) => {
+                let filesinfo = FilesInfo {
+                    list: fileinfo_list,
+                };
+                save_db(filesinfo);
+                println!("stop filestag...");
+            }
+            Err(_) => (),
+        }
+        thread::sleep(delay_duration);
+    }
 }

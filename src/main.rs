@@ -12,6 +12,10 @@ struct Args {
     #[arg(short, long, default_value = "test")]
     filestag: String,
 
+    /// Delay of filestag
+    #[arg(short, long, default_value_t = 1.0)]
+    delay: f32,
+
     /// Name of the vulnerability
     #[arg(short, long, default_value = "discuz")]
     name: String,
@@ -23,7 +27,7 @@ mod watchdog;
 fn main() {
     let args = Args::parse();
     match args.tool.as_str() {
-        "watchdog" => watchdog::filestag::run(&args.filestag),
+        "watchdog" => watchdog::filestag::run(&args.filestag, args.delay),
         _ => search::exploitalert::search(&args.name),
     }
 }
