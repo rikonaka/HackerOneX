@@ -9,15 +9,23 @@ struct Args {
     tool: String,
 
     /// Path of filestag watch
-    #[arg(short, long, default_value = "test")]
+    #[arg(long, default_value = "test")]
+    // watchdog
     filestag: String,
 
-    /// Delay of filestag
-    #[arg(short, long, default_value_t = 1.0)]
+    /// Enable filstag debug mode
+    #[arg(long)]
+    // watchdog
+    debug: bool,
+
+    /// Delay time
+    #[arg(long, default_value_t = 0.6)]
+    // watchdog
     delay: f32,
 
     /// Name of the vulnerability
     #[arg(short, long, default_value = "discuz")]
+    // search
     name: String,
 }
 
@@ -27,7 +35,7 @@ mod watchdog;
 fn main() {
     let args = Args::parse();
     match args.tool.as_str() {
-        "watchdog" => watchdog::filestag::run(&args.filestag, args.delay),
+        "watchdog" => watchdog::filestag::run(&args.filestag, args.debug, args.delay),
         _ => search::exploitalert::search(&args.name),
     }
 }
