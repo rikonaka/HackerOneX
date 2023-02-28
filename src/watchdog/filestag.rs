@@ -114,8 +114,8 @@ fn sha1_cal(data: &Vec<u8>) -> Option<String> {
 fn log_to_file(contents: &String) {
     let target_file = LOGFILE;
     let date = Local::now();
-    let data_str = date.format("%Y-%m-%d %H:%M:%S");
-    let log_str = format!("{} - {}", data_str, contents);
+    let date_str = date.format("%Y-%m-%d %H:%M:%S");
+    let log_str = format!("{} - {}", date_str, contents);
     if !Path::new(target_file).exists() {
         let mut file = fs::File::create(target_file).expect("Can not create the log file");
         writeln!(file, "{}", &log_str).expect("Can not write to log file");
