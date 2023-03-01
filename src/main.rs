@@ -68,7 +68,23 @@ const ARROW: &str = ">>>";
 fn search(debug: bool) {
     loop {
         "search".to_string().aa();
-        
+        let mut command = String::new();
+        let b1 = std::io::stdin().read_line(&mut command).unwrap();
+        command.rt().dm(debug);
+        let read_bytes = format!("read {} bytes", b1);
+        read_bytes.rt().dm(debug);
+
+        match command.rt().as_str() {
+            "exploitalert" | "ea" => search::exploitalert::search(&command.rt()),
+            "list" | "ls" => println!("filestag"),
+            _ => invaild_command(debug),
+        }
+    }
+}
+
+fn watchdog(debug: bool) {
+    loop {
+        "watchdog".to_string().aa();
         let mut command = String::new();
         let b1 = std::io::stdin().read_line(&mut command).unwrap();
         command.rt().dm(debug);
@@ -81,10 +97,6 @@ fn search(debug: bool) {
             _ => invaild_command(debug),
         }
     }
-}
-
-fn watchdog(debug: bool) {
-    "watchdog".to_string().aa();
 }
 
 fn invaild_command(debug: bool) {
