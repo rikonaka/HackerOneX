@@ -1,6 +1,10 @@
 use chrono::Local;
 use clap::Parser;
 use colored::Colorize;
+use std::collections::HashMap;
+
+mod search;
+mod watchdog;
 
 const ARROW: &str = ">>>";
 
@@ -25,71 +29,6 @@ struct Args {
     /// Set proxy
     #[arg(short, long, default_value = "null")] // socks5://127.0.0.1:1080
     proxy: String,
-}
-
-struct Menu<'a> {
-    name: &'a str,
-    data: Vec<Vec<&'a str>>,
-}
-
-impl Menu<'_> {
-    fn list(&self) {
-        for d in &self.data {
-            println!(
-                "{} [{}] - {}({})",
-                ">".green(),
-                self.name,
-                d[0].green(),
-                d[1].green()
-            );
-        }
-    }
-}
-
-fn recv_input(debug: bool) -> String {
-    let mut command = String::new();
-    let b1 = std::io::stdin().read_line(&mut command).unwrap();
-    command.rt().debug(debug);
-    let read_bytes = format!("read {} bytes", b1);
-    read_bytes.rt().debug(debug);
-    command.rt()
-}
-
-fn search(debug: bool, proxy: &Option<String>) {
-    let menu = Menu {
-        name: "search",
-        data: vec![vec!["exploitalert", "ea"]], // long, short
-    };
-    fn run_exploitalert(debug: bool, proxy: &Option<String>) {
-        println!("{}", "> Please input name of exploit.".green());
-        let name = recv_input(debug);
-        "running...".to_string().info();
-        search::exploitalert::run(&name, proxy);
-        "finish".to_string().info();
-    }
-    loop {
-        "search".to_string().arrow();
-        let command = recv_input(debug);
-        match command.as_str() {
-            "exploitalert" | "ea" => run_exploitalert(debug, proxy),
-            "list" | "ls" => menu.list(),
-            "back" | "b" => break,
-            _ => command.invaild_command(),
-        }
-    }
-}
-
-fn watchdog(debug: bool) {
-    loop {
-        "watchdog".to_string().arrow();
-        let command = recv_input(debug);
-        match command.as_str() {
-            "filestag" | "fs" => watchdog::filestag::run("test", debug, 1.0),
-            "list" | "ls" => println!("filestag"),
-            "back" | "b" => break,
-            _ => command.invaild_command(),
-        }
-    }
 }
 
 trait Message {
@@ -127,7 +66,7 @@ impl Message for String {
     fn arrow(&self) {
         let date = Local::now();
         let date_str = date.format("%Y-%m-%d %H:%M:%S");
-        println!("{} [{}] [{}]", ARROW.bold().green(), self, date_str);
+        println!("{} | {} [{}]", self, ARROW.bold().green(), date_str);
     }
     fn invaild_command(&self) {
         let error_message = format!("??? --> {}", self);
@@ -135,8 +74,177 @@ impl Message for String {
     }
 }
 
-mod search;
-mod watchdog;
+struct Parameters {
+    str_parameters: HashMap<String, Option<String>>,
+    bool_parameters: HashMap<String, bool>,
+}
+
+impl Parameters {
+    fn new() -> Parameters {
+        Parameters {
+            str_parameters: HashMap::new(),
+            bool_parameters: HashMap::new(),
+        }
+    }
+    fn get_str(&self, name: &str) -> Option<String> {
+        match self.str_parameters.get(name) {
+            Some(a) => (*a).clone(),
+            _ => None,
+        }
+    }
+    fn get_bool(&self, name: &str) -> bool {
+        match self.bool_parameters.get(name) {
+            Some(a) => *a,
+            _ => false,
+        }
+    }
+    fn add_str(&mut self, key: &str, value: Option<String>) {
+        self.str_parameters.insert(key.to_string(), value);
+    }
+    fn add_bool(&mut self, key: &str, value: bool) {
+        self.bool_parameters.insert(key.to_string(), value);
+    }
+}
+
+struct CommandsMap {
+    long: String,
+    short: String,
+    f: fn(&mut Parameters),
+    require_parameters: bool,
+    parameters: Vec<String>,
+}
+
+struct Commands<'a> {
+    name: &'a str,
+    level: usize,
+    map: Vec<CommandsMap>,
+}
+
+impl Commands<'_> {
+    fn new<'a>(name: &'a str, level: usize) -> Commands<'a> {
+        Commands {
+            name,
+            level,
+            map: Vec::new(),
+        }
+    }
+    fn add(
+        &mut self,
+        long: &str,
+        short: &str,
+        f: fn(&mut Parameters),
+        require_parameters: bool,
+        parameters: Vec<&str>,
+    ) {
+        let map = CommandsMap {
+            long: long.to_string(),
+            short: short.to_string(),
+            f,
+            require_parameters,
+            parameters: parameters.into_iter().map(|s| s.to_string()).collect(),
+        };
+        self.map.push(map);
+    }
+    fn menu(&self) {
+        // println!("{}", self.map.len());
+        for m in &self.map {
+            println!("> {}({})", m.long.red(), m.short.red());
+        }
+    }
+    fn run(&self, p: &mut Parameters) {
+        fn get_more_parameters(p: &mut Parameters, vec_string: &Vec<String>) {
+            let debug = p.get_bool("debug");
+            for s in vec_string {
+                let info_str = format!("> Please input [{}] value...", s);
+                println!("{}", info_str.green());
+                let input = recv_input(debug);
+                p.add_str(&s, Some(input));
+            }
+        }
+        let debug = p.get_bool("debug");
+        loop {
+            self.name.to_string().arrow();
+            let inputs = recv_input(debug);
+            // println!("inputs: {}", inputs);
+            let mut match_command = false;
+            if inputs == "list" || inputs == "ls" {
+                Self::menu(&self);
+                match_command = true;
+            } else if inputs == "back" || inputs == "b" {
+                if self.level != 0 {
+                    // top level can not back anymore
+                    break;
+                } else {
+                    match_command = true;
+                    "Please use ctrl-c to exit program".to_string().warning();
+                }
+            } else if inputs.rt().len() == 0 {
+                match_command = true;
+            } else {
+                for m in &self.map {
+                    if inputs == m.long || (inputs == m.short && m.short != "null") {
+                        if m.require_parameters {
+                            get_more_parameters(p, &m.parameters);
+                        }
+                        (m.f)(p);
+                        match_command = true;
+                    } else {
+                    }
+                }
+            }
+            if match_command == false {
+                inputs.invaild_command();
+            }
+            // println!();
+        }
+    }
+}
+
+/* FUNCTION */
+
+fn recv_input(debug: bool) -> String {
+    let mut command = String::new();
+    let b1 = std::io::stdin().read_line(&mut command).unwrap();
+    command.rt().debug(debug);
+    let read_bytes = format!("read {} bytes", b1);
+    read_bytes.rt().debug(debug);
+    command.rt()
+}
+
+fn search(p: &mut Parameters) {
+    fn run_exploitalert(p: &mut Parameters) {
+        // let debug = p.get_bool("debug");
+        let proxy = p.get_str("proxy");
+        let name = p.get_str("name").unwrap();
+        "running...".to_string().info();
+        search::exploitalert::run(&name, &proxy);
+        "finish".to_string().info();
+    }
+
+    let mut commands = Commands::new("search", 1);
+    commands.add("exploitalert", "ea", run_exploitalert, true, vec!["name"]);
+    commands.run(p);
+}
+
+fn watchdog(p: &mut Parameters) {
+    fn run_filestag(p: &mut Parameters) {
+        let debug = p.get_bool("debug");
+        let path = p.get_str("path").unwrap();
+        let delay = p.get_str("delay").unwrap();
+        let delay: f32 = delay.parse().unwrap();
+        watchdog::filestag::run(&path, debug, delay);
+    }
+
+    let mut commands = Commands::new("search", 1);
+    commands.add(
+        "exploitalert",
+        "ea",
+        run_filestag,
+        true,
+        vec!["path", "delay"],
+    );
+    commands.run(p);
+}
 
 fn main() {
     let args = Args::parse();
@@ -146,19 +254,13 @@ fn main() {
         _ => Some(args.proxy.to_string()),
     };
     println!("{}", WELCOME_INFO.bold().red());
-    let menu = Menu {
-        name: "main",
-        data: vec![vec!["search", "sr"], vec!["watchdog", "wd"]],
-    };
-
-    loop {
-        "main".to_string().arrow();
-        let command = recv_input(debug);
-        match command.as_str() {
-            "search" | "sr" => search(debug, &proxy),
-            "watchdog" | "wd" => watchdog(debug),
-            "list" | "ls" => menu.list(),
-            _ => command.invaild_command(),
-        }
-    }
+    // Parameters
+    let mut p = Parameters::new();
+    p.add_bool("debug", debug);
+    p.add_str("proxy", proxy);
+    // Commands
+    let mut commands = Commands::new("main", 0);
+    commands.add("search", "sr", search, false, vec![]);
+    commands.add("watchdog", "wd", watchdog, false, vec![]);
+    commands.run(&mut p);
 }
