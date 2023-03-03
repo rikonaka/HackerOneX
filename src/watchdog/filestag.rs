@@ -2,14 +2,14 @@ use chrono::Local;
 use crypto::digest::Digest;
 use crypto::md5::Md5;
 use crypto::sha1::Sha1;
-use ctrlc;
+// use ctrlc;
 use sqlite;
 use sqlite::{Connection, State};
 use std::fs::OpenOptions;
 use std::io::prelude::*;
 use std::path::Path;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::Arc;
+// use std::sync::atomic::{AtomicBool, Ordering};
+// use std::sync::Arc;
 use std::{fs, thread, time};
 use walkdir::WalkDir;
 
@@ -198,25 +198,26 @@ fn reverse(db: &Database, watchpath: &str) {
 
 pub fn run(path: &str, debug: bool, delay: f32) {
     let db = Database::connect();
-    let running = Arc::new(AtomicBool::new(true));
-    let r = running.clone();
-    ctrlc::set_handler(move || {
-        r.store(false, Ordering::SeqCst);
-    })
-    .expect("Error setting Ctrl-C handler");
+    // let running = Arc::new(AtomicBool::new(true));
+    // let r = running.clone();
+    // ctrlc::set_handler(move || {
+    //     r.store(false, Ordering::SeqCst);
+    // })
+    // .expect("Error setting Ctrl-C handler");
 
     match debug {
         true => db.show_all(),
         _ => {
             println!("diskwach runing...");
-            while running.load(Ordering::SeqCst) {
+            // while running.load(Ordering::SeqCst) {
+            loop {
                 forward(&db, path);
                 reverse(&db, path);
                 // sleep 1s
                 let ten_millis = time::Duration::from_secs_f32(delay);
                 thread::sleep(ten_millis);
             }
-            println!("Exiting now...");
+            // println!("Exiting now...");
         }
     }
 }

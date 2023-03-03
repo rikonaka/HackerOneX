@@ -3,10 +3,9 @@ use clap::Parser;
 use colored::Colorize;
 use std::collections::HashMap;
 
+mod brute;
 mod search;
 mod watchdog;
-
-const ARROW: &str = ">>>";
 
 const WELCOME_INFO: &str = r"
  _   _            _             _____       _____     
@@ -66,7 +65,7 @@ impl Message for String {
     fn arrow(&self) {
         let date = Local::now();
         let date_str = date.format("%Y-%m-%d %H:%M:%S");
-        println!("{} | {} [{}]", self, ARROW.bold().green(), date_str);
+        println!("{} {} [{}]", ">".green(), self.green(), date_str);
     }
     fn invaild_command(&self) {
         let error_message = format!("??? --> {}", self);
@@ -235,13 +234,28 @@ fn watchdog(p: &mut Parameters) {
         watchdog::filestag::run(&path, debug, delay);
     }
 
-    let mut commands = Commands::new("search", 1);
+    let mut commands = Commands::new("watchdog", 1);
+    commands.add("filestag", "fs", run_filestag, true, vec!["path", "delay"]);
+    commands.run(p);
+}
+
+fn brute(p: &mut Parameters) {
+    fn run_webdir(p: &mut Parameters) {
+        // let path = p.get_str("wordlist_path").unwrap();
+        // let target = p.get_str("target").unwrap();
+        // test
+        let path = "./src/brute/wordlists/common.txt";
+        let target = "http://192.168.194.131/";
+        brute::webdir::run(&path, &target);
+    }
+
+    let mut commands = Commands::new("brute", 1);
     commands.add(
-        "exploitalert",
-        "ea",
-        run_filestag,
+        "webdir",
+        "wr",
+        run_webdir,
         true,
-        vec!["path", "delay"],
+        vec!["wordlist_path", "target"],
     );
     commands.run(p);
 }
@@ -262,5 +276,6 @@ fn main() {
     let mut commands = Commands::new("main", 0);
     commands.add("search", "sr", search, false, vec![]);
     commands.add("watchdog", "wd", watchdog, false, vec![]);
+    commands.add("brute", "bt", brute, false, vec![]);
     commands.run(&mut p);
 }
