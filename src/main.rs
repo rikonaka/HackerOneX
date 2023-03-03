@@ -266,9 +266,9 @@ fn brute(p: &mut Parameters) {
                 brute::webdir::run(&path, &target, Some(&wordlists));
             } else {
                 if path == "all" {
-                    let wordlists = include_bytes!("./brute/wordlists/common.txt");
-                    let wordlists = include_bytes!("./brute/wordlists/big.txt");
+                    let wordlists = include_bytes!("./brute/wordlists/all.txt");
                     let wordlists = String::from_utf8_lossy(wordlists);
+                    brute::webdir::run(&path, &target, Some(&wordlists));
                 } else {
                     brute::webdir::run(&path, &target, None);
                 }

@@ -1,3 +1,4 @@
+use crate::Message;
 use kdam::{tqdm, BarExt};
 use reqwest;
 use std::fs::File;
@@ -32,6 +33,17 @@ async fn http_get(
     Ok(success_result)
 }
 
+fn de_duplication(input: Vec<String>) -> Vec<String> {
+    "de-duplication...".to_string().info();
+    let mut result = Vec::new();
+    for i in input {
+        if !result.contains(&i) {
+            result.push(i);
+        }
+    }
+    result
+}
+
 fn get_url_from_file(path: &str) -> Vec<String> {
     fn read_lines(filename: String) -> io::Lines<BufReader<File>> {
         // Open the file in read-only mode.
@@ -46,7 +58,7 @@ fn get_url_from_file(path: &str) -> Vec<String> {
     for line in lines {
         result_vec.push(line.unwrap());
     }
-    result_vec
+    de_duplication(result_vec)
 }
 
 fn get_url_from_str(wordlists: &str) -> Vec<String> {
@@ -56,7 +68,7 @@ fn get_url_from_str(wordlists: &str) -> Vec<String> {
     for v in vec {
         result.push(v.to_string());
     }
-    result
+    de_duplication(result)
 }
 
 fn check_target(target: &str) -> String {
