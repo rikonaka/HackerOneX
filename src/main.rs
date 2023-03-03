@@ -252,7 +252,7 @@ fn watchdog(p: &mut Parameters) {
 fn brute(p: &mut Parameters) {
     fn run_webdir(p: &mut Parameters) {
         let path = p
-            .get_str("wordlists_path (press enter to use default wordlists)")
+            .get_str("wordlists_path (press enter to use default wordlists, or 'all' to use all wordlists)")
             .unwrap();
         let target = p.get_str("target").unwrap();
         // test
@@ -260,12 +260,18 @@ fn brute(p: &mut Parameters) {
         // let target = "http://192.168.194.131/";
         if target.len() != 0 {
             if path.len() == 0 {
-                let wordlists = include_bytes!("./brute/wordlists/common.txt");
+                let wordlists = include_str!("./brute/wordlists/common.txt");
                 // let wordlists = include_bytes!("./brute/wordlists/big.txt");
-                let wordlists = String::from_utf8_lossy(wordlists);
+                // let wordlists = String::from_utf8_lossy(wordlists);
                 brute::webdir::run(&path, &target, Some(&wordlists));
             } else {
-                brute::webdir::run(&path, &target, None);
+                if path == "all" {
+                    let wordlists = include_bytes!("./brute/wordlists/common.txt");
+                    let wordlists = include_bytes!("./brute/wordlists/big.txt");
+                    let wordlists = String::from_utf8_lossy(wordlists);
+                } else {
+                    brute::webdir::run(&path, &target, None);
+                }
             }
         } else {
             "target should not be null".to_string().error();
@@ -279,7 +285,7 @@ fn brute(p: &mut Parameters) {
         run_webdir,
         true,
         vec![
-            "wordlists_path (press enter to use default wordlists)",
+            "wordlists_path (press enter to use default wordlists, or 'all' to use all wordlists)",
             "target",
         ],
     );
