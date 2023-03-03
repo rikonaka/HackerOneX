@@ -13,26 +13,30 @@ async fn http_get(
     let mut success_result: Vec<String> = Vec::new();
     let mut pb = tqdm!(total = url_vec.len());
     for url in url_vec {
-        let new_url = format!("{}{}", target, url);
-        // println!("{}", new_url);
-        let res = client.get(&new_url).send().await?;
-        match res.status() {
-            reqwest::StatusCode::OK => {
-                let message = format!("URL: {} - 200", &new_url);
-                pb.write(message);
-                success_result.push(new_url);
-            }
-            _ => {
-                // other => {
-                // panic!("Uh oh! Something unexpected happened: {:?}", other);
-                // println!("URL: {} - {}", &new_url, other.as_u16());
-            }
-        };
+        if url.len() > 0 {
+            let url = check_target(&url);
+            let new_url = format!("{}{}", target, url);
+            // println!("{}", new_url);
+            let res = client.get(&new_url).send().await?;
+            match res.status() {
+                reqwest::StatusCode::OK => {
+                    let message = format!("URL: {} - 200", &new_url);
+                    pb.write(message);
+                    success_result.push(new_url);
+                }
+                _ => {
+                    // other => {
+                    // panic!("Uh oh! Something unexpected happened: {:?}", other);
+                    // println!("URL: {} - {}", &new_url, other.as_u16());
+                }
+            };
+        }
         pb.update(1);
     }
     Ok(success_result)
 }
 
+/*
 fn de_duplication(input: Vec<String>) -> Vec<String> {
     "de-duplication...".to_string().info();
     let mut result = Vec::new();
@@ -43,6 +47,7 @@ fn de_duplication(input: Vec<String>) -> Vec<String> {
     }
     result
 }
+*/
 
 fn get_url_from_file(path: &str) -> Vec<String> {
     fn read_lines(filename: String) -> io::Lines<BufReader<File>> {
@@ -58,7 +63,8 @@ fn get_url_from_file(path: &str) -> Vec<String> {
     for line in lines {
         result_vec.push(line.unwrap());
     }
-    de_duplication(result_vec)
+    // de_duplication(result_vec)
+    result_vec
 }
 
 fn get_url_from_str(wordlists: &str) -> Vec<String> {
@@ -68,11 +74,16 @@ fn get_url_from_str(wordlists: &str) -> Vec<String> {
     for v in vec {
         result.push(v.to_string());
     }
-    de_duplication(result)
+    // de_duplication(result)
+    result
 }
 
 fn check_target(target: &str) -> String {
-    let target = if target.chars().last().unwrap() == '/' {
+    let last_char = match target.chars().last() {
+        Some(l) => l,
+        None => panic!("value: [{}]", target),
+    };
+    let target = if last_char == '/' {
         target.to_string()
     } else {
         let mut new_target = target.to_string();
@@ -87,20 +98,33 @@ fn check_target(target: &str) -> String {
     }
 }
 
+fn show_result(input: &Vec<String>) {
+    for i in input {
+        i.info();
+    }
+}
+
 // #[tokio::main(worker_threads = 32)]
 #[tokio::main]
-pub async fn run(path: &str, target: &str, wordlists: Option<&str>) -> Vec<String> {
+pub async fn run(path: &str, target: &str, wordlists: Option<&str>) {
     let start = Instant::now();
     let target = check_target(target);
-    let url_vec = match wordlists {
+    let mut url_vec = match wordlists {
         Some(w) => get_url_from_str(w),
         None => get_url_from_file(path),
     };
-    let result_200 = match http_get(&target, url_vec).await {
-        Ok(result) => result,
-        Err(e) => panic!("Run http_get error: {}", e),
-    };
+    loop {
+        let result_200 = match http_get(&target, url_vec).await {
+            Ok(result) => result,
+            Err(e) => panic!("Run http_get error: {}", e),
+        };
+        println!("{}", result_200.len());
+        if result_200.len() == 0 {
+            break;
+        }
+        show_result(&result_200);
+        url_vec = result_200;
+    }
     let duration = start.elapsed();
     println!("Exec time: {:?}", duration);
-    result_200
 }
