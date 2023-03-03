@@ -57,13 +57,18 @@ impl Message for String {
         }
     }
     fn rt(&self) -> String {
-        let result = match self.strip_suffix("\n") {
-            Some(m) => m.to_string(),
-            None => self.to_string(),
-        };
-        let result = match result.strip_suffix("\r") {
-            Some(m) => m.to_string(),
-            None => self.to_string(),
+        let result = if self.contains("\r\n") {
+            match self.strip_suffix("\r\n") {
+                Some(m) => m.to_string(),
+                None => self.to_string(),
+            }
+        } else if self.contains("\n") {
+            match self.strip_suffix("\n") {
+                Some(m) => m.to_string(),
+                None => self.to_string(),
+            }
+        } else {
+            self.to_string()
         };
         result
     }
@@ -283,7 +288,7 @@ fn brute(p: &mut Parameters) {
 
 fn main() {
     ctrlc::set_handler(move || {
-        println!("bye~");
+        "bye~".to_string().info();
         std::process::exit(0);
     })
     .expect("set ctrlc failed");
