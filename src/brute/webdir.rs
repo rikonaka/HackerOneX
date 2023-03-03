@@ -2,10 +2,8 @@ use kdam::{tqdm, BarExt};
 use reqwest;
 use std::fs::File;
 use std::io::{self, BufRead, BufReader};
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
-// #[tokio::main(worker_threads = 32)]
-#[tokio::main(worker_threads = 32)]
 async fn http_get(
     target: &str,
     url_vec: Vec<String>,
@@ -34,13 +32,13 @@ async fn http_get(
     Ok(success_result)
 }
 
-fn read_lines(filename: String) -> io::Lines<BufReader<File>> {
-    // Open the file in read-only mode.
-    let file = File::open(filename).unwrap();
-    // Read the file line by line, and return an iterator of the lines of the file.
-    return io::BufReader::new(file).lines();
-}
-fn get_url(path: &str) -> Vec<String> {
+fn get_url_from_file(path: &str) -> Vec<String> {
+    fn read_lines(filename: String) -> io::Lines<BufReader<File>> {
+        // Open the file in read-only mode.
+        let file = File::open(filename).unwrap();
+        // Read the file line by line, and return an iterator of the lines of the file.
+        return io::BufReader::new(file).lines();
+    }
     // Stores the iterator of lines of the file in lines variable.
     let lines = read_lines(path.to_string());
     // Iterate over the lines of the file, and in this case print them.
@@ -51,25 +49,46 @@ fn get_url(path: &str) -> Vec<String> {
     result_vec
 }
 
+fn get_url_from_str(wordlists: &str) -> Vec<String> {
+    let split = wordlists.split("\n");
+    let vec: Vec<&str> = split.collect();
+    let mut result = Vec::new();
+    for v in vec {
+        result.push(v.to_string());
+    }
+    result
+}
+
 fn check_target(target: &str) -> String {
-    if target.chars().last().unwrap() == '/' {
+    let target = if target.chars().last().unwrap() == '/' {
         target.to_string()
     } else {
         let mut new_target = target.to_string();
         new_target.push_str("/");
         new_target
+    };
+    if target.contains("http") {
+        target
+    } else {
+        let target = format!("http://{}", target);
+        target
     }
 }
 
-pub fn run(path: &str, target: &str) -> Vec<String> {
+// #[tokio::main(worker_threads = 32)]
+#[tokio::main]
+pub async fn run(path: &str, target: &str, wordlists: Option<&str>) -> Vec<String> {
     let start = Instant::now();
     let target = check_target(target);
-    let url_vec = get_url(path);
-    let result_200 = match http_get(&target, url_vec) {
+    let url_vec = match wordlists {
+        Some(w) => get_url_from_str(w),
+        None => get_url_from_file(path),
+    };
+    let result_200 = match http_get(&target, url_vec).await {
         Ok(result) => result,
         Err(e) => panic!("Run http_get error: {}", e),
     };
     let duration = start.elapsed();
-    println!("Exec time is: {:?}", duration);
+    println!("Exec time: {:?}", duration);
     result_200
 }

@@ -57,10 +57,15 @@ impl Message for String {
         }
     }
     fn rt(&self) -> String {
-        match self.strip_suffix("\n") {
+        let result = match self.strip_suffix("\n") {
             Some(m) => m.to_string(),
             None => self.to_string(),
-        }
+        };
+        let result = match result.strip_suffix("\r") {
+            Some(m) => m.to_string(),
+            None => self.to_string(),
+        };
+        result
     }
     fn arrow(&self) {
         let date = Local::now();
@@ -241,12 +246,25 @@ fn watchdog(p: &mut Parameters) {
 
 fn brute(p: &mut Parameters) {
     fn run_webdir(p: &mut Parameters) {
-        // let path = p.get_str("wordlist_path").unwrap();
-        // let target = p.get_str("target").unwrap();
+        let path = p
+            .get_str("wordlists_path (press enter to use default wordlists)")
+            .unwrap();
+        let target = p.get_str("target").unwrap();
         // test
-        let path = "./src/brute/wordlists/common.txt";
-        let target = "http://192.168.194.131/";
-        brute::webdir::run(&path, &target);
+        // let path = "./src/brute/wordlists/common.txt";
+        // let target = "http://192.168.194.131/";
+        if target.len() != 0 {
+            if path.len() == 0 {
+                let wordlists = include_bytes!("./brute/wordlists/common.txt");
+                // let wordlists = include_bytes!("./brute/wordlists/big.txt");
+                let wordlists = String::from_utf8_lossy(wordlists);
+                brute::webdir::run(&path, &target, Some(&wordlists));
+            } else {
+                brute::webdir::run(&path, &target, None);
+            }
+        } else {
+            "target should not be null".to_string().error();
+        }
     }
 
     let mut commands = Commands::new("brute", 1);
@@ -255,12 +273,21 @@ fn brute(p: &mut Parameters) {
         "wr",
         run_webdir,
         true,
-        vec!["wordlist_path", "target"],
+        vec![
+            "wordlists_path (press enter to use default wordlists)",
+            "target",
+        ],
     );
     commands.run(p);
 }
 
 fn main() {
+    ctrlc::set_handler(move || {
+        println!("bye~");
+        std::process::exit(0);
+    })
+    .expect("set ctrlc failed");
+
     let args = Args::parse();
     let debug = args.debug;
     let proxy: Option<String> = match args.proxy.as_str() {
