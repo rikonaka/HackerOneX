@@ -278,6 +278,17 @@ fn brute(p: &mut Parameters) {
         }
     }
 
+    fn run_portscan(p: &mut Parameters) {
+        let target = p.get_str("target").unwrap();
+        // i.e. 22-100
+        let port_range = p.get_str("port_range(22-1024)").unwrap();
+        let mut protocol = p.get_str("protocol(press enter to use tcp)").unwrap();
+        if protocol.len() == 0 {
+            protocol = "tcp".to_string();
+        }
+        brute::portscan::run(&target, &port_range, &protocol);
+    }
+
     let mut commands = Commands::new("brute", 1);
     commands.add(
         "webdir",
@@ -288,6 +299,13 @@ fn brute(p: &mut Parameters) {
             "wordlists_path (press enter to use default wordlists, or 'all' to use all wordlists)",
             "target",
         ],
+    );
+    commands.add(
+        "portscan",
+        "ps",
+        run_portscan,
+        true,
+        vec!["target", "port_range(22-1024)", "protocol(press enter to use tcp)"],
     );
     commands.run(p);
 }
