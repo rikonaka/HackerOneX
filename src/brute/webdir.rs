@@ -100,7 +100,7 @@ fn check_target(target: &str) -> String {
 
 fn show_result(input: &Vec<String>) {
     for i in input {
-        i.info();
+        i.info_message();
     }
 }
 
