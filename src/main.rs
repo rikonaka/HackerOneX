@@ -7,6 +7,8 @@ mod brute;
 mod search;
 mod watchdog;
 
+const VERSION: &str = "v0.2.0";
+
 const WELCOME_INFO: &str = r"
  _   _            _             _____       _____     
 | | | |          | |           |  _  |     |  ___|    
@@ -14,7 +16,6 @@ const WELCOME_INFO: &str = r"
 |  _  |/ _` |/ __| |/ / _ \ '__| | | | '_ \|  __\ \/ /
 | | | | (_| | (__|   <  __/ |  \ \_/ / | | | |___>  < 
 \_| |_/\__,_|\___|_|\_\___|_|   \___/|_| |_\____/_/\_\
-
 
 ";
 
@@ -305,7 +306,11 @@ fn brute(p: &mut Parameters) {
         "ps",
         run_portscan,
         true,
-        vec!["target", "port_range(22-1024)", "protocol(press enter to use tcp)"],
+        vec![
+            "target",
+            "port_range(22-1024)",
+            "protocol(press enter to use tcp)",
+        ],
     );
     commands.run(p);
 }
@@ -323,7 +328,7 @@ fn main() {
         "null" => None,
         _ => Some(args.proxy.to_string()),
     };
-    println!("{}", WELCOME_INFO.bold().red());
+    println!("{}\n{}", WELCOME_INFO.bold().red(), VERSION.bold().green());
     // Parameters
     let mut p = Parameters::new();
     p.add_bool("debug", debug);
