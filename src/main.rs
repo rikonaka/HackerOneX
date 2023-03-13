@@ -124,6 +124,7 @@ struct CommandsMap {
     require_parameters: bool,
     parameters: Vec<String>,
     default_value: Vec<String>,
+    info_value: Vec<String>,
 }
 
 struct Commands<'a> {
@@ -148,7 +149,16 @@ impl Commands<'_> {
         require_parameters: bool,
         parameters: Vec<&str>,
         default_value: Vec<&str>,
+        info_value: Vec<&str>,
     ) {
+        if (parameters.len() != default_value.len())
+            | (parameters.len() != info_value.len())
+            | (default_value.len() != info_value.len())
+        {
+            let e_str = "Commands add parameters should has same length".to_string();
+            e_str.error_message();
+            panic!("{}", e_str);
+        }
         let map = CommandsMap {
             long: long.to_string(),
             short: short.to_string(),
@@ -156,6 +166,7 @@ impl Commands<'_> {
             require_parameters,
             parameters: parameters.into_iter().map(|s| s.to_string()).collect(),
             default_value: default_value.into_iter().map(|s| s.to_string()).collect(),
+            info_value: info_value.into_iter().map(|s| s.to_string()).collect(),
         };
         self.map.push(map);
     }
@@ -170,12 +181,13 @@ impl Commands<'_> {
             p: &mut Parameters,
             parameters_vec: &Vec<String>,
             default_vec: &Vec<String>,
+            info_vec: &Vec<String>,
         ) {
             let debug = p.get_bool("debug");
             for (i, s) in parameters_vec.iter().enumerate() {
                 let info_str = format!(
-                    "> Please input [{}] value (default: {})...",
-                    s, &default_vec[i]
+                    "> Please input [{}] parameter ({}, default: {})...",
+                    s, &info_vec[i], &default_vec[i]
                 );
                 println!("{}", info_str.green());
                 let input = recv_input(debug).remove_tails();
@@ -211,7 +223,7 @@ impl Commands<'_> {
                 for m in &self.map {
                     if inputs == m.long || (inputs == m.short && m.short != "null") {
                         if m.require_parameters {
-                            get_more_parameters(p, &m.parameters, &m.default_value);
+                            get_more_parameters(p, &m.parameters, &m.default_value, &m.info_value);
                         }
                         (m.f)(p);
                         match_command = true;
@@ -256,6 +268,7 @@ fn search(p: &mut Parameters) {
         true,
         vec!["name"],
         vec!["discuz!"],
+        vec!["name of the vulnerability you want to query"],
     );
     commands.run(p);
 }
@@ -277,6 +290,7 @@ fn watchdog(p: &mut Parameters) {
         true,
         vec!["path", "delay"],
         vec!["./test/", "1.0"],
+        vec!["the path you wanna watch", "how often to check for changes"],
     );
     commands.run(p);
 }
@@ -317,6 +331,7 @@ fn brute(p: &mut Parameters) {
         true,
         vec!["wordlists_path", "target"],
         vec!["common", "127.0.0.1"],
+        vec!["wordlists file path", "scan target address"],
     );
     commands.add(
         "portscan",
@@ -325,41 +340,44 @@ fn brute(p: &mut Parameters) {
         true,
         vec!["target", "port_range", "protocol"],
         vec!["127.0.0.1", "22-1024", "tcp"],
+        vec!["port scan target address", "port range", "scan protocol"],
     );
     commands.run(p);
 }
 
 fn sqltools(p: &mut Parameters) {
-    fn run_mysql(p: &mut Parameters) {
-        let username = p.get_str("username").unwrap();
-        let password = p.get_str("password").unwrap();
-        let host = p.get_str("host").unwrap();
-        let port = p.get_str("port").unwrap();
-        let database = p.get_str("database").unwrap();
-        sqltools::client::run(&username, &password, &host, &port, &database);
+    fn run_sql_client(p: &mut Parameters) {
+        let sqlurl = p.get_str("sqlurl").unwrap();
+        let sqltype = p.get_str("sqltype").unwrap();
+        sqltools::client::run(&sqlurl, &sqltype);
     }
 
     let mut commands = Commands::new("sqltools", 1);
     commands.add(
-        "mysql",
+        "client",
         "null",
-        run_mysql,
+        run_sql_client,
         true,
-        vec!["username", "password", "host", "port", "database"],
-        vec!["root", "123456", "localhost", "3306", "test"],
+        vec!["sqlurl", "sqltype"],
+        vec!["mysql://root:password@localhost:3306/db_name", "mysql"],
+        vec![
+            "target sql url",
+            "database type, i.e. mysql, psql, redis, sqlite",
+        ],
     );
     commands.run(p);
 }
 
 fn main() {
+    let args = Args::parse();
+    let debug = args.debug;
+
     ctrlc::set_handler(move || {
         "bye~".to_string().info_message();
         std::process::exit(0);
     })
     .expect("set ctrlc failed");
 
-    let args = Args::parse();
-    let debug = args.debug;
     let proxy: Option<String> = match args.proxy.as_str() {
         "null" => None,
         _ => Some(args.proxy.to_string()),
@@ -371,9 +389,9 @@ fn main() {
     p.add_str("proxy", proxy);
     // Commands
     let mut commands = Commands::new("main", 0);
-    commands.add("search", "sr", search, false, vec![], vec![]);
-    commands.add("watchdog", "wd", watchdog, false, vec![], vec![]);
-    commands.add("brute", "bt", brute, false, vec![], vec![]);
-    commands.add("sqltools", "st", sqltools, false, vec![], vec![]);
+    commands.add("search", "sr", search, false, vec![], vec![], vec![]);
+    commands.add("watchdog", "wd", watchdog, false, vec![], vec![], vec![]);
+    commands.add("brute", "bt", brute, false, vec![], vec![], vec![]);
+    commands.add("sqltools", "st", sqltools, false, vec![], vec![], vec![]);
     commands.run(&mut p);
 }
