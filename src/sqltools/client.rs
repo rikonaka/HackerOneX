@@ -64,7 +64,7 @@ impl SqlData {
                 None => "<null>".to_string(),
             }
         } else {
-            "null".to_string()
+            "<null>".to_string()
         };
         value
     }
