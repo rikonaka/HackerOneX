@@ -336,10 +336,10 @@ fn sqltools(p: &mut Parameters) {
         let host = p.get_str("host").unwrap();
         let port = p.get_str("port").unwrap();
         let database = p.get_str("database").unwrap();
-        sqltools::mysql_client::run(&username, &password, &host, &port, &database);
+        sqltools::client::run(&username, &password, &host, &port, &database);
     }
 
-    let mut commands = Commands::new("mysql", 1);
+    let mut commands = Commands::new("sqltools", 1);
     commands.add(
         "mysql",
         "null",

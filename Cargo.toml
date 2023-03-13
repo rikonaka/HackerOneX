@@ -22,4 +22,4 @@ sqlite = "0.30.4"
 chrono = "0.4.23"
 colored = "2.0.0"
 kdam = "0.3.0"
-mysql = "23.0.1"
+sqlx = { version = "^0.6", features = [ "runtime-tokio-native-tls" , "postgres", "mysql" ] }

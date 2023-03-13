@@ -1,1 +1,1 @@
-pub mod mysql_client;
+pub mod client;
