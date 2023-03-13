@@ -35,22 +35,22 @@ impl SqlData {
         let value = if self.string_type.contains_key(col_name) {
             match self.string_type.get(col_name) {
                 Some(v) => v.to_string(),
-                None => "null".to_string(),
+                None => "<null>".to_string(),
             }
         } else if self.int_type.contains_key(col_name) {
             match self.int_type.get(col_name) {
                 Some(v) => v.to_string(),
-                None => "null".to_string(),
+                None => "<null>".to_string(),
             }
         } else if self.float_type.contains_key(col_name) {
             match self.float_type.get(col_name) {
                 Some(v) => v.to_string(),
-                None => "null".to_string(),
+                None => "<null>".to_string(),
             }
         } else if self.date_type.contains_key(col_name) {
             match self.date_type.get(col_name) {
                 Some(v) => v.to_string(),
-                None => "null".to_string(),
+                None => "<null>".to_string(),
             }
         } else if self.unsupport_type.contains_key(col_name) {
             match self.unsupport_type.get(col_name) {
@@ -61,7 +61,7 @@ impl SqlData {
                         Err(_) => "<binary>".to_string(),
                     }
                 }
-                None => "null".to_string(),
+                None => "<null>".to_string(),
             }
         } else {
             "null".to_string()
