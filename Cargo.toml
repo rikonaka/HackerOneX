@@ -9,18 +9,19 @@ edition = "2021"
 openssl = { version = "0.10", features = ["vendored"] }
 
 [dependencies]
-reqwest = { version = "0.11", features = ["json", "socks"] }
-tokio = { version = "1", features = ["full"] }
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-clap = { version = "4.1.6", features = ["derive"] }
-ctrlc = { version = "^3.2", features = ["termination"] }
-walkdir = "2"
-md5 = "0.7.0"
-rust-crypto = "^0.2"
-sqlite = "0.30.4"
-chrono = "0.4.23"
-colored = "2.0.0"
-kdam = "0.3.0"
-sqlx = { version = "^0.6", features = [ "runtime-tokio-native-tls" , "chrono", "postgres", "mysql" ] }
-anyhow = "^1.0"
+reqwest = { version = "^0", features = ["json", "socks"] }
+tokio = { version = "^1", features = ["full"] }
+serde = { version = "^1", features = ["derive"] }
+serde_json = "^1"
+clap = { version = "^4", features = ["derive"] }
+ctrlc = { version = "^3", features = ["termination"] }
+walkdir = "^2"
+md5 = "^0"
+rust-crypto = "^0"
+sqlite = "^0"
+chrono = "^0"
+colored = "^2"
+kdam = "^0"
+sqlx = { version = "^0", features = ["runtime-tokio-native-tls" , "json", "chrono", "bigdecimal", "uuid", "ipnetwork", "mac_address", "bit-vec", "postgres", "mysql"] }
+anyhow = "^1"
+actix-web = "^4"

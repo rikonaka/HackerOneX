@@ -7,6 +7,7 @@ mod brute;
 mod search;
 mod sqltools;
 mod watchdog;
+mod honeypot;
 
 const VERSION: &str = "v0.2.0";
 
@@ -346,24 +347,41 @@ fn brute(p: &mut Parameters) {
 }
 
 fn sqltools(p: &mut Parameters) {
-    fn run_sql_client(p: &mut Parameters) {
+    fn run_client(p: &mut Parameters) {
         let sqlurl = p.get_str("sqlurl").unwrap();
-        let sqltype = p.get_str("sqltype").unwrap();
-        sqltools::client::run(&sqlurl, &sqltype);
+        sqltools::client::run(&sqlurl);
     }
 
     let mut commands = Commands::new("sqltools", 1);
     commands.add(
         "client",
-        "null",
-        run_sql_client,
+        "ct",
+        run_client,
         true,
-        vec!["sqlurl", "sqltype"],
-        vec!["mysql://root:password@localhost:3306/db_name", "mysql"],
-        vec![
-            "target sql url",
-            "database type, i.e. mysql, psql, redis, sqlite",
-        ],
+        vec!["sqlurl"],
+        vec!["mysql://root:password@localhost:3306/db_name"],
+        vec!["target sql url"],
+    );
+    commands.run(p);
+}
+
+fn honeypot(p: &mut Parameters) {
+    fn run_web(p: &mut Parameters) {
+        let address = p.get_str("address").unwrap();
+        let port = p.get_str("port").unwrap();
+        let port:u16 = port.parse().unwrap();
+        honeypot::web::run(&address, port);
+    }
+
+    let mut commands = Commands::new("honeypot", 1);
+    commands.add(
+        "web",
+        "w",
+        run_web,
+        true,
+        vec!["address", "port"],
+        vec!["0.0.0.0", "8080"],
+        vec!["listen address", "listen port"],
     );
     commands.run(p);
 }
@@ -393,5 +411,6 @@ fn main() {
     commands.add("watchdog", "wd", watchdog, false, vec![], vec![], vec![]);
     commands.add("brute", "bt", brute, false, vec![], vec![], vec![]);
     commands.add("sqltools", "st", sqltools, false, vec![], vec![], vec![]);
+    commands.add("honeypot", "hp", honeypot, false, vec![], vec![], vec![]);
     commands.run(&mut p);
 }

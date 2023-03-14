@@ -1,94 +1,72 @@
 use crate::Message;
-use chrono;
-use sqlx::Column;
-use sqlx::Connection;
-use sqlx::MySqlConnection;
-use sqlx::PgConnection;
-use sqlx::Row;
-use sqlx::TypeInfo;
+use sqlx::types::{JsonValue, Uuid, BigDecimal};
+use sqlx::types::chrono::{NaiveDateTime, NaiveDate, NaiveTime, DateTime};
+// use sqlx::postgres::types::PgInterval;
+// use sqlx::postgres::types::PgRange;
+// use sqlx::postgres::types::PgMoney;
+// use sqlx::postgres::types::PgTimeTz;
+use sqlx::types::ipnetwork::IpNetwork;
+use sqlx::types::mac_address::MacAddress;
+// use sqlx::types::BitVec;
+use sqlx::{Column, Connection, Row, TypeInfo};
+use sqlx::{MySqlConnection, PgConnection};
 use std::collections::HashMap;
 
-struct SqlData {
-    string_type: HashMap<String, String>,
-    int_type: HashMap<String, i32>,
-    float_type: HashMap<String, f32>,
-    date_type: HashMap<String, chrono::DateTime<chrono::Utc>>,
-    unsupport_type: HashMap<String, Vec<u8>>,
+struct SqlRow {
+    max_len: usize,
+    row: HashMap<String, String>,
 }
 
-impl SqlData {
-    fn new() -> SqlData {
-        let string_type = HashMap::new();
-        let int_type = HashMap::new();
-        let float_type = HashMap::new();
-        let date_type = HashMap::new();
-        let unsupport_type = HashMap::new();
-        SqlData {
-            string_type,
-            int_type,
-            float_type,
-            date_type,
-            unsupport_type,
+impl SqlRow {
+    fn new() -> SqlRow {
+        let row = HashMap::new();
+        SqlRow {
+            max_len: 18,
+            row,
         }
     }
     fn get(&self, col_name: &str) -> String {
-        let value = if self.string_type.contains_key(col_name) {
-            match self.string_type.get(col_name) {
+        let value = if self.row.contains_key(col_name) {
+            match self.row.get(col_name) {
                 Some(v) => v.to_string(),
-                None => "<null>".to_string(),
-            }
-        } else if self.int_type.contains_key(col_name) {
-            match self.int_type.get(col_name) {
-                Some(v) => v.to_string(),
-                None => "<null>".to_string(),
-            }
-        } else if self.float_type.contains_key(col_name) {
-            match self.float_type.get(col_name) {
-                Some(v) => v.to_string(),
-                None => "<null>".to_string(),
-            }
-        } else if self.date_type.contains_key(col_name) {
-            match self.date_type.get(col_name) {
-                Some(v) => v.to_string(),
-                None => "<null>".to_string(),
-            }
-        } else if self.unsupport_type.contains_key(col_name) {
-            match self.unsupport_type.get(col_name) {
-                Some(v) => {
-                    // String::from_utf8_lossy(v).to_string()
-                    match String::from_utf8(v.clone()) {
-                        Ok(s) => s.to_string(),
-                        Err(_) => "<binary>".to_string(),
-                    }
-                }
-                None => "<null>".to_string(),
+                None => "[null]".to_string(),
             }
         } else {
-            "<null>".to_string()
+            "[null]".to_string()
         };
         value
+    }
+    fn insert(&mut self, col_name: &str, value: String) {
+        let mix_value = if value.len() > self.max_len {
+            let mut value_part = value[..self.max_len].to_string();
+            value_part.push_str("..");
+            value_part
+        } else {
+            value
+        };
+        self.row.insert(col_name.to_string(), mix_value);
     }
 }
 
 struct SqlDatas {
     col_name_vec: Vec<String>,
     max_col_len: HashMap<String, usize>,
-    data: Vec<SqlData>,
+    sql_row: Vec<SqlRow>,
 }
 
 impl SqlDatas {
     fn new() -> SqlDatas {
         let max_col_len = HashMap::new();
         let col_name_vec = Vec::new();
-        let data: Vec<SqlData> = Vec::new();
+        let data: Vec<SqlRow> = Vec::new();
         SqlDatas {
             col_name_vec,
             max_col_len,
-            data,
+            sql_row: data,
         }
     }
-    fn push_sql_data(&mut self, sql_data: SqlData) {
-        self.data.push(sql_data);
+    fn push_sql_data(&mut self, sql_data: SqlRow) {
+        self.sql_row.push(sql_data);
     }
     fn push_col_name(&mut self, col_name: &str) {
         if !self.col_name_vec.contains(&col_name.to_string()) {
@@ -101,7 +79,7 @@ impl SqlDatas {
                 .insert(col_name.to_string(), col_name.len() + 2);
         }
         // calculate the max col len
-        for d in &self.data {
+        for d in &self.sql_row {
             for col_name in &self.col_name_vec {
                 let value = d.get(&col_name);
                 if value.len() + 2 > *self.max_col_len.get(col_name).unwrap() {
@@ -135,7 +113,7 @@ impl SqlDatas {
             }
             println!("{}", col_string);
             println!("{}", hline_string);
-            for d in &self.data {
+            for d in &self.sql_row {
                 let mut col_string = String::from("|");
                 for col_name in &self.col_name_vec {
                     let mut value = d.get(&col_name);
@@ -155,6 +133,11 @@ impl SqlDatas {
     }
 }
 
+fn unsupported_type(name: &str) {
+    let e_str = format!("Unsupported type: {}", name);
+    e_str.warning_message();
+}
+
 fn recv_input(debug: bool) -> String {
     let mut command = String::new();
     "Please input a sql statement:".to_string().info_message();
@@ -169,7 +152,7 @@ async fn mysql_query(conn: &mut MySqlConnection, sql: &str) -> anyhow::Result<()
     let mut sql_datas = SqlDatas::new();
 
     for rec in &rows {
-        let mut sql_data = SqlData::new();
+        let mut sql_data = SqlRow::new();
         // println!("{:?}", rec);
         let len = rec.len();
         // println!("{:?}", len);
@@ -180,31 +163,92 @@ async fn mysql_query(conn: &mut MySqlConnection, sql: &str) -> anyhow::Result<()
             // println!("{:?}", col);
             let type_info = col.type_info();
             match type_info.name() {
-                "CHAR" | "VARCHAR" | "BLOB" | "TEXT" | "TINYBLOB" | "TINYTEXT" | "MEDIUMBLOB"
-                | "MEDIUMTEXT" | "LONGBLOB" | "LONGTEXT" | "ENUM" => {
+                "BOOLEAN" | "TINYINT(1)" => {
+                    let value: bool = rec.get(i);
+                    sql_data.row.insert(col_name.to_string(), value.to_string());
+                }
+                "TINYINT" => {
+                    let value: i8 = rec.get(i);
+                    sql_data.insert(col_name, value.to_string());
+                }
+                "SMALLINT" => {
+                    let value: i16 = rec.get(i);
+                    sql_data.insert(col_name, value.to_string());
+                }
+                "INT" => {
+                    let value: i32 = rec.get(i);
+                    sql_data.insert(col_name, value.to_string());
+                }
+                "BIGINT" => {
+                    let value: i64 = rec.get(i);
+                    sql_data.insert(col_name, value.to_string());
+                }
+                "TINYINT UNSIGNED" => {
+                    let value: u8 = rec.get(i);
+                    sql_data.insert(col_name, value.to_string());
+                }
+                "SMALLINT UNSIGNED" => {
+                    let value: u16 = rec.get(i);
+                    sql_data.insert(col_name, value.to_string());
+                }
+                "INT UNSIGNED" => {
+                    let value: u32 = rec.get(i);
+                    sql_data.insert(col_name, value.to_string());
+                }
+                "BIGINT UNSIGNED" => {
+                    let value: u64 = rec.get(i);
+                    sql_data.insert(col_name, value.to_string());
+                }
+                "FLOAT" => {
+                    let value: f32 = rec.get(i);
+                    sql_data.insert(col_name, value.to_string());
+                }
+                "DOUBLE" => {
+                    let value: f64 = rec.get(i);
+                    sql_data.insert(col_name, value.to_string());
+                }
+                "VARCHAR" | "CHAR" | "TEXT" => {
                     let value: String = rec.get(i);
                     // println!("{}", value);
-                    sql_data.string_type.insert(col_name.to_string(), value);
+                    sql_data.insert(col_name, value);
                 }
-                "INT" | "TINYINT" | "SMALLINT" | "MEDIUMINT" | "BIGINT" => {
-                    let value: i32 = rec.get(i);
-                    // println!("{}", value);
-                    sql_data.int_type.insert(col_name.to_string(), value);
+                "VARBINARY" | "BINARY" | "BLOB" => {
+                    // let value: Vec<u8> = rec.get(i);
+                    sql_data.insert(col_name, "[binary]".to_string());
                 }
-                "FLOAT" | "DOUBLE" | "DECIMAL" => {
-                    let value: f32 = rec.get(i);
-                    // println!("{}", value);
-                    sql_data.float_type.insert(col_name.to_string(), value);
+                "TIMESTAMP" => {
+                    let value: DateTime<chrono::Utc> = rec.get(i);
+                    sql_data.insert(col_name, value.to_string());
                 }
-                "DATE" | "DATETIME" | "TIMESTAMP" | "TIME" | "YEAR" => {
-                    let value: chrono::DateTime<chrono::Utc> = rec.get(i);
-                    // println!("{}", value);
-                    sql_data.date_type.insert(col_name.to_string(), value);
+                "DATETIME" => {
+                    let value: NaiveDateTime = rec.get(i);
+                    sql_data.insert(col_name, value.to_string());
+                }
+                "DATE" => {
+                    let value: NaiveDate = rec.get(i);
+                    sql_data.insert(col_name, value.to_string());
+
+                }
+                "TIME" => {
+                    let value: NaiveTime = rec.get(i);
+                    sql_data.insert(col_name, value.to_string());
+                }
+                "DECIMAL" => {
+                    let value: BigDecimal = rec.get(i);
+                    sql_data.insert(col_name, value.to_string());
+                }
+                "BYTE(16)" => {
+                    let value: Uuid = rec.get(i);
+                    sql_data.insert(col_name, value.to_string());
+                }
+                "JSON" => {
+                    let value: JsonValue = rec.get(i);
+                    sql_data.insert(col_name, value.to_string());
                 }
                 _ => {
-                    println!("Unsupported type: {}", type_info.name());
-                    let value: Vec<u8> = rec.get(i);
-                    sql_data.unsupport_type.insert(col_name.to_string(), value);
+                    // let value: Vec<u8> = rec.get(i);
+                    unsupported_type(type_info.name());
+                    sql_data.row.insert(col_name.to_string(), "[binary]".to_string());
                 }
             };
         }
@@ -249,7 +293,7 @@ async fn psql_query(conn: &mut PgConnection, sql: &str) -> anyhow::Result<()> {
     let mut sql_datas = SqlDatas::new();
 
     for rec in &rows {
-        let mut sql_data = SqlData::new();
+        let mut sql_data = SqlRow::new();
         // println!("{:?}", rec);
         let len = rec.len();
         // println!("{:?}", len);
@@ -260,29 +304,102 @@ async fn psql_query(conn: &mut PgConnection, sql: &str) -> anyhow::Result<()> {
             // println!("{:?}", col);
             let type_info = col.type_info();
             match type_info.name() {
-                "CHAR" | "VARCHAR" | "BLOB" | "TEXT" | "TINYBLOB" | "TINYTEXT" | "MEDIUMBLOB"
-                | "MEDIUMTEXT" | "LONGBLOB" | "LONGTEXT" | "ENUM" => {
-                    let value: String = rec.get(i);
-                    // println!("{}", value);
-                    sql_data.string_type.insert(col_name.to_string(), value);
+                "BOOL" => {
+                    let value: bool = rec.get(i);
+                    sql_data.insert(col_name, value.to_string());
                 }
-                "INT" | "TINYINT" | "SMALLINT" | "MEDIUMINT" | "BIGINT" => {
+                "CHAR" => {
+                    let value: i8 = rec.get(i);
+                    sql_data.insert(col_name, value.to_string());
+                }
+                "SMALLINT" | "SMALLSERIAL" | "INT2" => {
+                    let value: i16 = rec.get(i);
+                    sql_data.insert(col_name, value.to_string());
+                }
+                "INT" | "SERIAL" | "INT4" => {
                     let value: i32 = rec.get(i);
-                    // println!("{}", value);
-                    sql_data.int_type.insert(col_name.to_string(), value);
+                    sql_data.insert(col_name, value.to_string());
                 }
-                "FLOAT" | "DOUBLE" | "DECIMAL" => {
+                "BIGINT" | "BIGSERIAL" | "INT8" => {
+                    let value: i64 = rec.get(i);
+                    sql_data.insert(col_name, value.to_string());
+                }
+                "REAL" | "FLOAT4" => {
                     let value: f32 = rec.get(i);
-                    // println!("{}", value);
-                    sql_data.float_type.insert(col_name.to_string(), value);
+                    sql_data.insert(col_name, value.to_string());
                 }
-                "DATE" | "DATETIME" | "TIMESTAMP" | "TIME" | "YEAR" => {
-                    let value: chrono::DateTime<chrono::Utc> = rec.get(i);
-                    // println!("{}", value);
-                    sql_data.date_type.insert(col_name.to_string(), value);
+                "DOUBLE PRECISION" | "FLOAT8" => {
+                    let value: f64 = rec.get(i);
+                    sql_data.insert(col_name, value.to_string());
+                }
+                "VARCHAR" | "CHAR(N)" | "TEXT" | "NAME" => {
+                    let value: String = rec.get(i);
+                    sql_data.insert(col_name, value.to_string());
+                }
+                "BYTEA" => {
+                    // let value: Vec<u8> = rec.get(i);
+                    sql_data.insert(col_name, "<binary>".to_string());
+                }
+                "INTERVAL" => {
+                    // let value: PgInterval = rec.get(i);
+                    sql_data.insert(col_name, "<interval>".to_string());
+                }
+                "INT8RANGE" | "INT4RANGE" | "TSRANGE" | "TSTZRANGE" | "DATERANGE" | "NUMRANGE" => {
+                    // let value: PgRange<T> = rec.get(i);
+                    sql_data.insert(col_name, "<range>".to_string());
+                }
+                "MONEY" => {
+                    // let value: PgMoney = rec.get(i);
+                    sql_data.insert(col_name, "<money>".to_string());
+                }
+                "NUMERIC" => {
+                    let value: BigDecimal = rec.get(i);
+                    sql_data.insert(col_name, value.to_string());
+                }
+                "TIMESTAMPTZ" => {
+                    let value: DateTime<chrono::Utc> = rec.get(i);
+                    sql_data.insert(col_name, value.to_string());
+                }
+                "TIMESTAMP" => {
+                    let value: NaiveDateTime = rec.get(i);
+                    sql_data.insert(col_name, value.to_string());
+                }
+                "DATE" => {
+                    let value: NaiveDate = rec.get(i);
+                    sql_data.insert(col_name, value.to_string());
+                }
+                "TIME" => {
+                    let value: NaiveTime = rec.get(i);
+                    sql_data.insert(col_name, value.to_string());
+                }
+                "TIMETZ" => {
+                    // let value: PgTimeTz = rec.get(i);
+                    sql_data.insert(col_name, "<timez>".to_string());
+                }
+                "UUID" => {
+                    let value: Uuid = rec.get(i);
+                    sql_data.insert(col_name, value.to_string());
+                }
+                "INET" | "CIDR" => {
+                    let value: IpNetwork = rec.get(i);
+                    sql_data.insert(col_name, value.to_string());
+                }
+                "MACADDR" => {
+                    let value: MacAddress = rec.get(i);
+                    sql_data.insert(col_name, value.to_string());
+                }
+                "BIT" | "VARBIT" => {
+                    // let value: BitVec = rec.get(i);
+                    sql_data.insert(col_name, "<bit>".to_string());
+                }
+                "JSON" | "JSONB" => {
+                    let value: JsonValue = rec.get(i);
+                    sql_data.insert(col_name, value.to_string());
                 }
                 _ => {
-                    println!("Unsupported type: {}", type_info.name());
+                    unsupported_type(type_info.name());
+                    // let value: Vec<u8> = rec.get(i);
+                    sql_data.insert(col_name, "[binary]".to_string());
                 }
             };
         }
@@ -321,16 +438,27 @@ async fn psql_connect(url: &str) -> Result<(), sqlx::Error> {
     }
 }
 
-pub fn run(sqlurl: &str, sqltype: &str) {
+
+pub fn run(sqlurl: &str) {
+    // NOTE: SQLite is only have C API, and MSSQL not support fully in SQLx
     // let url = "mysql://root:password@localhost:3306/db_name";
-    match sqltype {
-        "psql" => match psql_connect(&sqlurl) {
-            Ok(_) => (),
-            Err(e) => println!("Exec sql failed: {}", e),
-        },
-        _ => match mysql_connect(&sqlurl) {
-            Ok(_) => (),
-            Err(e) => println!("Exec sql failed: {}", e),
-        },
+    let sqlurl_split = sqlurl.split(":");
+    let sqlurl_vec: Vec<&str> = sqlurl_split.collect();
+    if sqlurl_vec.len() > 0 {
+        let sqltype = sqlurl_vec[0];
+        match sqltype {
+            "postgres" => match psql_connect(&sqlurl) {
+                Ok(_) => (),
+                Err(e) => println!("Exec sql failed: {}", e),
+            },
+            "mysql" | "mariadb" => match mysql_connect(&sqlurl) {
+                Ok(_) => (),
+                Err(e) => println!("Exec sql failed: {}", e),
+            },
+            _ => {
+                let e_str = format!("Wrong database type: {}", sqltype);
+                e_str.error_message();
+            },
+        }
     }
 }
