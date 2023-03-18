@@ -7,27 +7,38 @@ use std::time::Instant;
 
 async fn http_get(
     target: &str,
-    url_vec: Vec<String>,
+    url_vec: &Vec<String>,
 ) -> Result<Vec<String>, Box<dyn std::error::Error>> {
+    let max_line_len = 30;
     let client = reqwest::Client::new();
     let mut success_result: Vec<String> = Vec::new();
     let mut pb = tqdm!(total = url_vec.len());
     for url in url_vec {
         if url.len() > 0 {
-            let url = check_target(&url);
-            let new_url = format!("{}{}", target, url);
-            // println!("{}", new_url);
+            let mut new_url = format!("{}{}", target, url);
             let res = client.get(&new_url).send().await?;
+            if new_url.len() >= max_line_len {
+                pb.set_description(format!("SCAN {}", &new_url[..max_line_len]));
+            } else {
+                for _ in 0..(max_line_len - new_url.len()) {
+                    new_url = format!("{} ", new_url);
+                }
+                pb.set_description(format!("SCAN {}", &new_url));
+            }
+            // println!("{}", new_url);
             match res.status() {
                 reqwest::StatusCode::OK => {
                     let message = format!("URL: {} - 200", &new_url);
                     pb.write(message);
+                    // println!("{}", message);
                     success_result.push(new_url);
                 }
                 _ => {
                     // other => {
-                    // panic!("Uh oh! Something unexpected happened: {:?}", other);
-                    // println!("URL: {} - {}", &new_url, other.as_u16());
+                    // let space_str = " ".repeat(100);
+                    // print!("\rURL: {} - {:?}{}", &new_url, other, space_str);
+                    // let message = format!("URL: {} - {:?}", &new_url, other);
+                    // pb.write(message);
                 }
             };
         }
@@ -79,9 +90,10 @@ fn get_url_from_str(wordlists: &str) -> Vec<String> {
 }
 
 fn check_target(target: &str) -> String {
+    let target = target.trim();
     let last_char = match target.chars().last() {
         Some(l) => l,
-        None => panic!("value: [{}]", target),
+        None => panic!("Target last char not found: {}", target),
     };
     let target = if last_char == '/' {
         target.to_string()
@@ -108,13 +120,19 @@ fn show_result(input: &Vec<String>) {
 #[tokio::main]
 pub async fn run(path: &str, target: &str, wordlists: Option<&str>) {
     let start = Instant::now();
-    let target = check_target(target);
-    let mut url_vec = match wordlists {
+    let mut target_vec = vec![check_target(target)];
+    let url_vec = match wordlists {
         Some(w) => get_url_from_str(w),
         None => get_url_from_file(path),
     };
+    let mut index = 0;
     loop {
-        let result_200 = match http_get(&target, url_vec).await {
+        if index >= target_vec.len() {
+            break;
+        }
+        let target = target_vec.get(index).unwrap();
+        index += 1;
+        let result_200 = match http_get(&target, &url_vec).await {
             Ok(result) => result,
             Err(e) => panic!("Run http_get error: {}", e),
         };
@@ -123,7 +141,7 @@ pub async fn run(path: &str, target: &str, wordlists: Option<&str>) {
             break;
         }
         show_result(&result_200);
-        url_vec = result_200;
+        target_vec.extend(result_200);
     }
     let duration = start.elapsed();
     println!("Exec time: {:?}", duration);

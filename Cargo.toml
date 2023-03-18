@@ -21,7 +21,8 @@ rust-crypto = "^0"
 sqlite = "^0"
 chrono = "^0"
 colored = "^2"
-kdam = "^0"
+kdam = { version = "^0", features = ["gradient", "template"] }
 sqlx = { version = "^0", features = ["runtime-tokio-native-tls" , "json", "chrono", "bigdecimal", "uuid", "ipnetwork", "mac_address", "bit-vec", "postgres", "mysql"] }
 anyhow = "^1"
-actix-web = "^4"
+http-body-util = "0.1.0-rc.2"
+hyper = { version = "1.0.0-rc.3", features = ["full"] }

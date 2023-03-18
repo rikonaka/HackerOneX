@@ -4,10 +4,10 @@ use colored::Colorize;
 use std::collections::HashMap;
 
 mod brute;
+mod honeypot;
 mod search;
 mod sqltools;
 mod watchdog;
-mod honeypot;
 
 const VERSION: &str = "v0.2.0";
 
@@ -369,7 +369,7 @@ fn honeypot(p: &mut Parameters) {
     fn run_web(p: &mut Parameters) {
         let address = p.get_str("address").unwrap();
         let port = p.get_str("port").unwrap();
-        let port:u16 = port.parse().unwrap();
+        let port: u16 = port.parse().unwrap();
         honeypot::web::run(&address, port);
     }
 
