@@ -9,28 +9,29 @@ async fn http_get(
     target: &str,
     url_vec: &Vec<String>,
 ) -> Result<Vec<String>, Box<dyn std::error::Error>> {
-    let max_line_len = 30;
+    // let max_line_len = 30;
     let client = reqwest::Client::new();
     let mut success_result: Vec<String> = Vec::new();
     let mut pb = tqdm!(total = url_vec.len());
     for url in url_vec {
         if url.len() > 0 {
-            let mut new_url = format!("{}{}", target, url);
+            let new_url = format!("{}{}", target, url);
+            // let new_url_clone = new_url.clone();
+            // println!("{}", &new_url);
             let res = client.get(&new_url).send().await?;
-            if new_url.len() >= max_line_len {
-                pb.set_description(format!("SCAN {}", &new_url[..max_line_len]));
-            } else {
-                for _ in 0..(max_line_len - new_url.len()) {
-                    new_url = format!("{} ", new_url);
-                }
-                pb.set_description(format!("SCAN {}", &new_url));
-            }
-            // println!("{}", new_url);
+            // windows have some bug
+            // if new_url.len() >= max_line_len {
+            //     pb.set_description(format!("SCAN {}", &new_url[..max_line_len]));
+            // } else {
+            //     for _ in 0..(max_line_len - new_url.len()) {
+            //         new_url = format!("{} ", new_url);
+            //     }
+            //     pb.set_description(format!("SCAN {}", &new_url));
+            // }
             match res.status() {
                 reqwest::StatusCode::OK => {
-                    let message = format!("URL: {} - 200", &new_url);
-                    pb.write(message);
                     // println!("{}", message);
+                    pb.write(format!("URL: {} - 200", &new_url.trim()));
                     success_result.push(new_url);
                 }
                 _ => {

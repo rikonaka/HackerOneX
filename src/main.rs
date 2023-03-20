@@ -2,7 +2,9 @@ use chrono::Local;
 use clap::Parser;
 use colored::Colorize;
 use std::collections::HashMap;
+use std::thread;
 
+mod backend;
 mod brute;
 mod honeypot;
 mod search;
@@ -31,6 +33,9 @@ struct Args {
     /// Set proxy
     #[arg(short, long, default_value = "null")] // socks5://127.0.0.1:1080
     proxy: String,
+    /// Do not use backend
+    #[arg(short, long, action)]
+    no_backend: bool,
 }
 
 trait Message {
@@ -369,8 +374,9 @@ fn honeypot(p: &mut Parameters) {
     fn run_web(p: &mut Parameters) {
         let address = p.get_str("address").unwrap();
         let port = p.get_str("port").unwrap();
+        let config = p.get_str("config").unwrap();
         let port: u16 = port.parse().unwrap();
-        honeypot::web::run(&address, port);
+        honeypot::web::run(&address, port, &config);
     }
 
     let mut commands = Commands::new("honeypot", 1);
@@ -379,16 +385,23 @@ fn honeypot(p: &mut Parameters) {
         "w",
         run_web,
         true,
-        vec!["address", "port"],
-        vec!["0.0.0.0", "8080"],
-        vec!["listen address", "listen port"],
+        vec!["address", "port", "config"],
+        vec!["0.0.0.0", "8080", "./src/honeypot/response.txt"],
+        vec!["listen address", "listen port", "config file path"],
     );
     commands.run(p);
 }
 
 fn main() {
+    // run backend first
     let args = Args::parse();
     let debug = args.debug;
+    match args.no_backend {
+        false => {
+            thread::spawn(|| backend::service::run());
+        }
+        _ => (),
+    }
 
     ctrlc::set_handler(move || {
         "bye~".to_string().info_message();
