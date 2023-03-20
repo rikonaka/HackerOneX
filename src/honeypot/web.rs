@@ -83,7 +83,9 @@ fn read_conf(file_path: &str) -> HashMap<String, String> {
     maps
 }
 
-async fn hello(req: Request<hyper::body::Incoming>) -> Result<Response<Full<Bytes>>, Infallible> {
+async fn process_connection(
+    req: Request<hyper::body::Incoming>,
+) -> Result<Response<Full<Bytes>>, Infallible> {
     // println!("{:?}", req.uri());
     // let maps = read_conf(&config_path);
     let uri = req.uri().to_string();
@@ -159,12 +161,15 @@ async fn web(
         // Spawn a tokio task to serve multiple connections concurrently
         tokio::task::spawn(async move {
             // Finally, we bind the incoming connection to our `hello` service
-            if let Err(err) = http1::Builder::new()
-                // `service_fn` converts our function in a `Service`
-                .serve_connection(stream, service_fn(hello))
+            match http1::Builder::new()
+                .serve_connection(stream, service_fn(process_connection))
                 .await
             {
-                println!("Error serving connection: {:?}", err);
+                Ok(_) => (),
+                Err(e) => {
+                    let e_str = format!("Error serving connection: {:?}", e);
+                    e_str.error_message();
+                }
             }
         });
     }

@@ -98,7 +98,7 @@ impl BackendCommand {
 }
 
 const DEFAULT_PORT: u16 = 23333;
-const BUFF_SIZE: usize = 4096 * 10000;
+const BUFF_SIZE: usize = 4096 * 100 * 100;
 
 #[tokio::main]
 async fn tcp_server() -> Result<(), Box<dyn Error>> {
