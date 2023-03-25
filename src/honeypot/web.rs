@@ -14,6 +14,8 @@ use hyper::service::service_fn;
 use hyper::{Request, Response};
 use tokio::net::TcpListener;
 
+use crate::NULL;
+
 fn read_conf(file_path: &str) -> HashMap<String, String> {
     let contents = fs::read_to_string(file_path).expect("Should have been able to read the file");
     // println!("{}", contents);
@@ -94,13 +96,13 @@ async fn process_connection(
     let bc = BackendCommand::new(Some("get".to_string()), Some(uri), None);
     let default_response = match default_bc.connect_backend().await {
         Ok(v) => String::from_utf8_lossy(&v).to_string(),
-        _ => "null".to_string(),
+        _ => NULL.to_string(),
     };
     let response = match bc.connect_backend().await {
         Ok(v) => {
             let v_str = String::from_utf8_lossy(&v).to_string();
             match v_str.as_str() {
-                "null" => default_response,
+                NULL => default_response,
                 _ => v_str,
             }
         }
@@ -145,15 +147,15 @@ async fn web(
             Some(v.to_string()),
         );
         bc.connect_backend().await.unwrap();
-        pb.set_description(format!("GEN RESPONSE"));
+        pb.set_description(format!("Gen response from file.."));
         pb.update(1);
     }
 
     // let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     let addr = format!("{}:{}", address, port);
     // We create a TcpListener and bind it to 127.0.0.1:3000
-    let listener = TcpListener::bind(addr).await?;
-    "Running honeypot..".to_string().info_message();
+    let listener = TcpListener::bind(&addr).await?;
+    format!("Running honeypot at {}..", &addr).info_message();
     // We start a loop to continuously accept incoming connections
     loop {
         let (stream, _) = listener.accept().await?;

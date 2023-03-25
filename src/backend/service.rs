@@ -5,8 +5,10 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 
 use crate::Message;
+use crate::NULL;
 
 pub struct TinyDatabase {
+    // request: response
     database: HashMap<String, String>,
 }
 
@@ -21,6 +23,30 @@ impl TinyDatabase {
             Some(v) => Some(v.to_string()),
             None => None,
         }
+    }
+    fn wild_get(&self, key: &str) -> Option<String> {
+        // key: /sql.php?id=1
+        // k: /sql.php
+        let mut match_hm = HashMap::new();
+        let mut max_len = 0;
+        for k in self.database.keys() {
+            let v = self.database.get(k).unwrap();
+            if key.contains(k) {
+                // k.len() is max match length of substring
+                if k.len() > max_len {
+                    max_len = k.len();
+                }
+                match_hm.insert(v.to_string(), k.len());
+            }
+        }
+        // find the max match substring and return
+        for v in match_hm.keys() {
+            let l = match_hm.get(v).unwrap();
+            if max_len == *l {
+                return Some(v.to_string());
+            }
+        }
+        None
     }
     fn set(&mut self, key: &str, value: &str) {
         self.database.insert(key.to_string(), value.to_string());
@@ -40,7 +66,7 @@ impl BackendCommand {
         key: Option<String>,
         value: Option<String>,
     ) -> BackendCommand {
-        let default_null_value = String::from("null");
+        let default_null_value = String::from(NULL);
         let name_ = match command {
             Some(n) => n,
             _ => default_null_value.clone(),
@@ -126,11 +152,16 @@ async fn tcp_server() -> Result<(), Box<dyn Error>> {
                         "Ok".to_string()
                     }
                     "get" => {
-                        let value = match tb.get(&bc.key) {
+                        match tb.get(&bc.key) {
                             Some(v) => v,
-                            _ => "null".to_string(),
-                        };
-                        value
+                            _ => NULL.to_string(),
+                        }
+                    }
+                    "wild_get" => {
+                        match tb.wild_get(&bc.key) {
+                            Some(v) => v,
+                            _ => NULL.to_string(),
+                        }
                     }
                     _ => "Unknown command".to_string(),
                 };

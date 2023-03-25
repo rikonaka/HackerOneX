@@ -1,6 +1,6 @@
 use crate::Message;
-use sqlx::types::{JsonValue, Uuid, BigDecimal};
-use sqlx::types::chrono::{NaiveDateTime, NaiveDate, NaiveTime, DateTime};
+use sqlx::types::chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime};
+use sqlx::types::{BigDecimal, JsonValue, Uuid};
 // use sqlx::postgres::types::PgInterval;
 // use sqlx::postgres::types::PgRange;
 // use sqlx::postgres::types::PgMoney;
@@ -11,6 +11,9 @@ use sqlx::types::mac_address::MacAddress;
 use sqlx::{Column, Connection, Row, TypeInfo};
 use sqlx::{MySqlConnection, PgConnection};
 use std::collections::HashMap;
+// use std::error::Error;
+
+use crate::NULL;
 
 struct SqlRow {
     max_len: usize,
@@ -20,19 +23,16 @@ struct SqlRow {
 impl SqlRow {
     fn new() -> SqlRow {
         let row = HashMap::new();
-        SqlRow {
-            max_len: 18,
-            row,
-        }
+        SqlRow { max_len: 18, row }
     }
     fn get(&self, col_name: &str) -> String {
         let value = if self.row.contains_key(col_name) {
             match self.row.get(col_name) {
                 Some(v) => v.to_string(),
-                None => "[null]".to_string(),
+                None => format!("[{}]", NULL),
             }
         } else {
-            "[null]".to_string()
+            format!("[{}]", NULL)
         };
         value
     }
@@ -138,12 +138,13 @@ fn unsupported_type(name: &str) {
     e_str.warning_message();
 }
 
-fn recv_input(debug: bool) -> String {
+fn recv_input() -> String {
     let mut command = String::new();
     "Please input a sql statement:".to_string().info_message();
-    let b1 = std::io::stdin().read_line(&mut command).unwrap();
-    let read_bytes = format!("read {} bytes", b1);
-    read_bytes.remove_tails().debug_message(debug);
+    let _ = std::io::stdin().read_line(&mut command).unwrap();
+    // let b1 = std::io::stdin().read_line(&mut command).unwrap();
+    // let read_bytes = format!("read {} bytes", b1);
+    // read_bytes.remove_tails().debug_message(debug);
     command.remove_tails()
 }
 
@@ -227,7 +228,6 @@ async fn mysql_query(conn: &mut MySqlConnection, sql: &str) -> anyhow::Result<()
                 "DATE" => {
                     let value: NaiveDate = rec.get(i);
                     sql_data.insert(col_name, value.to_string());
-
                 }
                 "TIME" => {
                     let value: NaiveTime = rec.get(i);
@@ -248,7 +248,9 @@ async fn mysql_query(conn: &mut MySqlConnection, sql: &str) -> anyhow::Result<()
                 _ => {
                     // let value: Vec<u8> = rec.get(i);
                     unsupported_type(type_info.name());
-                    sql_data.row.insert(col_name.to_string(), "[binary]".to_string());
+                    sql_data
+                        .row
+                        .insert(col_name.to_string(), "[binary]".to_string());
                 }
             };
         }
@@ -269,7 +271,7 @@ async fn mysql_connect(url: &str) -> Result<(), sqlx::Error> {
     // let pool = MySqlPool::connect(&url).await?;
     let mut conn = MySqlConnection::connect(&url).await?;
     loop {
-        let command = recv_input(false);
+        let command = recv_input();
         match command.as_str() {
             "exit" => return Ok(()),
             _ => {
@@ -419,7 +421,7 @@ async fn psql_connect(url: &str) -> Result<(), sqlx::Error> {
     // let pool = MySqlPool::connect(&url).await?;
     let mut conn = PgConnection::connect(&url).await?;
     loop {
-        let command = recv_input(false);
+        let command = recv_input();
         match command.as_str() {
             "exit" => return Ok(()),
             _ => {
@@ -438,6 +440,21 @@ async fn psql_connect(url: &str) -> Result<(), sqlx::Error> {
     }
 }
 
+// #[tokio::main]
+// async fn sqlite_connect(url: &str) -> Result<(), Box<dyn Error>> {
+//     let info = format!("SQLite connecting to {}...", &url);
+//     info.info_message();
+//     let conn = sqlite::open(url).unwrap();
+//     loop {
+//         let command = recv_input();
+//         match command.as_str() {
+//             "exit" => return Ok(()),
+//             _ => {
+//                 conn.execute(command).unwrap();
+//             }
+//         };
+//     }
+// }
 
 pub fn run(sqlurl: &str) {
     // NOTE: SQLite is only have C API, and MSSQL not support fully in SQLx
@@ -455,10 +472,14 @@ pub fn run(sqlurl: &str) {
                 Ok(_) => (),
                 Err(e) => println!("Exec sql failed: {}", e),
             },
+            // "sqlite" => match sqlite_connect(&sqlurl) {
+            //     Ok(_) => (),
+            //     Err(e) => println!("Exec sql failed: {}", e),
+            // },
             _ => {
                 let e_str = format!("Wrong database type: {}", sqltype);
                 e_str.error_message();
-            },
+            }
         }
     }
 }

@@ -1,19 +1,15 @@
-use chrono::Local;
 use crypto::digest::Digest;
 use crypto::md5::Md5;
 use crypto::sha1::Sha1;
-// use ctrlc;
 use sqlite;
 use sqlite::{Connection, State};
-use std::fs::OpenOptions;
-use std::io::prelude::*;
-use std::path::Path;
-// use std::sync::atomic::{AtomicBool, Ordering};
-// use std::sync::Arc;
 use std::{fs, thread, time};
 use walkdir::WalkDir;
 
-const LOGFILE: &str = "filestag.log";
+use crate::Message;
+use crate::NULL;
+use crate::VERBOSE_FLAG;
+
 const DBFILE: &str = "filestag.db";
 
 struct Database {
@@ -24,12 +20,8 @@ impl Database {
     fn connect() -> Self {
         let connection = sqlite::open(DBFILE).unwrap();
         let sql_str = "CREATE TABLE IF NOT EXISTS files (path TEXT UNIQUE, md5 TEXT, sha1 TEXT, last_opt TEXT);";
-        match connection.execute(sql_str) {
-            _ => (),
-        }
-        Database {
-            connection: connection,
-        }
+        connection.execute(sql_str).unwrap();
+        Database { connection }
     }
     fn insert(&self, path: &String, md5: &String, sha1: &String, last_opt: &String) {
         // println!("{}", file_path);
@@ -39,18 +31,14 @@ impl Database {
             "INSERT INTO files (path, md5, sha1, last_opt) VALUES ('{}', '{}', '{}', '{}');",
             path, md5, sha1, last_opt
         );
-        match self.connection.execute(sql_str) {
-            _ => (),
-        }
+        self.connection.execute(sql_str).unwrap();
     }
     fn update(&self, path: &String, md5: &String, sha1: &String, last_opt: &String) {
         let sql_str = format!(
             "UPDATE files SET md5='{}', sha1='{}', last_opt='{}' WHERE path='{}'",
             md5, sha1, last_opt, path
         );
-        match self.connection.execute(sql_str) {
-            _ => (),
-        }
+        self.connection.execute(sql_str).unwrap();
     }
     fn select(&self, path: &String) -> Vec<Vec<String>> {
         // let sql_str = format!("SELECT * FROM files;");
@@ -88,13 +76,17 @@ impl Database {
         let sql_str = format!("SELECT * FROM files;");
         let mut statement = self.connection.prepare(sql_str).unwrap();
         while let State::Row = statement.next().unwrap() {
-            println!("path = {}", statement.read::<String, _>("path").unwrap());
-            println!("md5 = {}", statement.read::<String, _>("md5").unwrap());
-            println!("sha1 = {}", statement.read::<String, _>("sha1").unwrap());
-            println!(
+            let path = format!("path = {}", statement.read::<String, _>("path").unwrap());
+            let md5 = format!("md5 = {}", statement.read::<String, _>("md5").unwrap());
+            let sha1 = format!("sha1 = {}", statement.read::<String, _>("sha1").unwrap());
+            let last_opt = format!(
                 "last_opt = {}",
                 statement.read::<String, _>("last_opt").unwrap()
             );
+            path.verbose_message();
+            md5.verbose_message();
+            sha1.verbose_message();
+            last_opt.verbose_message();
         }
     }
 }
@@ -109,27 +101,6 @@ fn sha1_cal(data: &Vec<u8>) -> Option<String> {
     let mut sha1_hasher = Sha1::new();
     sha1_hasher.input(data);
     Some(sha1_hasher.result_str())
-}
-
-fn log_to_file(contents: &String) {
-    let target_file = LOGFILE;
-    let date = Local::now();
-    let date_str = date.format("%Y-%m-%d %H:%M:%S");
-    let log_str = format!("{} - {}", date_str, contents);
-    if !Path::new(target_file).exists() {
-        let mut file = fs::File::create(target_file).expect("Can not create the log file");
-        writeln!(file, "{}", &log_str).expect("Can not write to log file");
-    } else {
-        let mut file = OpenOptions::new()
-            .write(true)
-            .append(true)
-            .open(target_file)
-            .unwrap();
-        if let Err(e) = writeln!(file, "{}", log_str) {
-            eprintln!("Couldn't write to file: {}", e);
-        }
-    }
-    println!("{}", log_str);
 }
 
 fn all_files(target_dir: &String) -> Vec<String> {
@@ -162,7 +133,8 @@ fn forward(db: &Database, watchpath: &str) {
                 let sha1_old = &q[2];
                 if (*md5_old != md5) && (*sha1_old != sha1) {
                     let log_str = format!("Some file changed: {}", f);
-                    log_to_file(&log_str);
+                    log_str.info_message();
+                    // log_to_file(&log_str);
                     // println!("update");
                     let last_opt = String::from("changed");
                     db.update(&f, &md5, &sha1, &last_opt);
@@ -171,7 +143,8 @@ fn forward(db: &Database, watchpath: &str) {
         } else {
             // println!("insert");
             let log_str = format!("Some file added: {}", f);
-            log_to_file(&log_str);
+            log_str.info_message();
+            // log_to_file(&log_str);
             let last_opt = String::from("Added");
             db.insert(&f, &md5, &sha1, &last_opt);
         }
@@ -188,36 +161,28 @@ fn reverse(db: &Database, watchpath: &str) {
         let path = &df[0];
         if !all_files_v.contains(path) && last_opt != "deleted" {
             let log_str = format!("Some file deleted: {}", path);
-            let null = String::from("null");
+            let null = String::from(NULL);
             let last_opt = String::from("deleted");
             db.update(path, &null, &null, &last_opt);
-            log_to_file(&log_str);
+            // log_to_file(&log_str);
+            log_str.info_message();
         }
     }
 }
 
-pub fn run(path: &str, debug: bool, delay: f32) {
+pub fn run(path: &str, delay: f32) {
     let db = Database::connect();
-    // let running = Arc::new(AtomicBool::new(true));
-    // let r = running.clone();
-    // ctrlc::set_handler(move || {
-    //     r.store(false, Ordering::SeqCst);
-    // })
-    // .expect("Error setting Ctrl-C handler");
-
-    match debug {
+    let verbose = VERBOSE_FLAG.get().unwrap();
+    match verbose {
         true => db.show_all(),
-        _ => {
-            println!("diskwach runing...");
-            // while running.load(Ordering::SeqCst) {
-            loop {
-                forward(&db, path);
-                reverse(&db, path);
-                // sleep 1s
-                let ten_millis = time::Duration::from_secs_f32(delay);
-                thread::sleep(ten_millis);
-            }
-            // println!("Exiting now...");
-        }
+        _ => (),
+    }
+    "diskwatch runing...".to_string().info_message();
+    loop {
+        forward(&db, path);
+        reverse(&db, path);
+        // sleep 1s
+        let ten_millis = time::Duration::from_secs_f32(delay);
+        thread::sleep(ten_millis);
     }
 }

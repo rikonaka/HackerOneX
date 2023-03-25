@@ -1,7 +1,10 @@
 use chrono::Local;
 use clap::Parser;
 use colored::Colorize;
+use once_cell::sync::OnceCell;
 use std::collections::HashMap;
+use std::fs::OpenOptions;
+use std::io::Write;
 use std::thread;
 
 mod backend;
@@ -10,6 +13,11 @@ mod honeypot;
 mod search;
 mod sqltools;
 mod watchdog;
+
+static LOG_FLAG: OnceCell<bool> = OnceCell::new();
+static VERBOSE_FLAG: OnceCell<bool> = OnceCell::new();
+
+const NULL: &str = "null";
 
 const VERSION: &str = "v0.2.0";
 
@@ -27,58 +35,81 @@ const WELCOME_INFO: &str = r"
 #[derive(Parser, Debug)]
 #[command(author, version, about, long_about = None)]
 struct Args {
-    /// Enable debug mode
-    #[arg(short, long)]
-    debug: bool,
     /// Set proxy
-    #[arg(short, long, default_value = "null")] // socks5://127.0.0.1:1080
+    #[arg(short, long, default_value = NULL)] // socks5://127.0.0.1:1080
     proxy: String,
     /// Do not use backend
     #[arg(short, long, action)]
     no_backend: bool,
+    /// Log to file
+    #[arg(short, long, action)]
+    log: bool,
+    /// Set in verbose mode
+    #[arg(short, long, action)]
+    verbose: bool,
 }
 
 trait Message {
+    fn log_to_file(&self);
     fn warning_message(&self);
     fn info_message(&self);
     fn error_message(&self);
-    fn debug_message(&self, debug: bool);
+    fn verbose_message(&self);
     fn remove_tails(&self) -> String;
     fn arrow_message(&self);
     fn invaild_command(&self);
 }
 
 impl Message for String {
+    fn log_to_file(&self) {
+        let log = LOG_FLAG.get().expect("Get global value failed");
+        match log {
+            true => {
+                let date = Local::now();
+                let date_str = date.format("%Y-%m-%d %H:%M:%S");
+                let mut file = OpenOptions::new()
+                    .write(true)
+                    .create(true)
+                    .append(true)
+                    .open("./hackeronex.log")
+                    .unwrap();
+                writeln!(file, "{} - {}", date_str, self).expect("Write to log file failed");
+            }
+            _ => (),
+        }
+    }
     fn warning_message(&self) {
-        println!("{} {}", "[warning]".yellow(), self);
+        let message = format!("{} {}", "[warning]".yellow(), self);
+        println!("{}", &message);
+        let message = format!("{} {}", "[warning]", self);
+        message.log_to_file()
     }
     fn info_message(&self) {
-        println!("{} {}", "[info]".green(), self);
+        let message = format!("{} {}", "[info]".green(), self);
+        println!("{}", &message);
+        let message = format!("{} {}", "[info]", self);
+        message.log_to_file()
     }
     fn error_message(&self) {
-        println!("{} {}", "[error]".red(), self);
+        let message = format!("{} {}", "[error]".red(), self);
+        println!("{}", &message);
+        let message = format!("{} {}", "[error]", self);
+        message.log_to_file();
     }
-    fn debug_message(&self, debug: bool) {
-        match debug {
-            true => println!("{} {}", "[debug]".yellow(), self),
+    fn verbose_message(&self) {
+        let verbose = VERBOSE_FLAG.get().expect("Get global value failed");
+        match verbose {
+            true => {
+                let message = format!("{} {}", "[verbose]".yellow(), self);
+                println!("{}", message);
+                let message = format!("{} {}", "[verbose]", self);
+                message.log_to_file();
+            }
             _ => (),
         }
     }
     fn remove_tails(&self) -> String {
-        let result = if self.contains("\r\n") {
-            match self.strip_suffix("\r\n") {
-                Some(m) => m.to_string(),
-                None => self.to_string(),
-            }
-        } else if self.contains("\n") {
-            match self.strip_suffix("\n") {
-                Some(m) => m.to_string(),
-                None => self.to_string(),
-            }
-        } else {
-            self.to_string()
-        };
-        result
+        self.trim().to_string()
     }
     fn arrow_message(&self) {
         let date = Local::now();
@@ -93,14 +124,12 @@ impl Message for String {
 
 struct Parameters {
     str_parameters: HashMap<String, Option<String>>,
-    bool_parameters: HashMap<String, bool>,
 }
 
 impl Parameters {
     fn new() -> Parameters {
         Parameters {
             str_parameters: HashMap::new(),
-            bool_parameters: HashMap::new(),
         }
     }
     fn get_str(&self, name: &str) -> Option<String> {
@@ -109,17 +138,8 @@ impl Parameters {
             _ => None,
         }
     }
-    fn get_bool(&self, name: &str) -> bool {
-        match self.bool_parameters.get(name) {
-            Some(a) => *a,
-            _ => false,
-        }
-    }
     fn add_str(&mut self, key: &str, value: Option<String>) {
         self.str_parameters.insert(key.to_string(), value);
-    }
-    fn add_bool(&mut self, key: &str, value: bool) {
-        self.bool_parameters.insert(key.to_string(), value);
     }
 }
 
@@ -189,14 +209,14 @@ impl Commands<'_> {
             default_vec: &Vec<String>,
             info_vec: &Vec<String>,
         ) {
-            let debug = p.get_bool("debug");
+            // let debug = p.get_bool("debug");
             for (i, s) in parameters_vec.iter().enumerate() {
                 let info_str = format!(
                     "> Please input [{}] parameter ({}, default: {})...",
                     s, &info_vec[i], &default_vec[i]
                 );
                 println!("{}", info_str.green());
-                let input = recv_input(debug).remove_tails();
+                let input = recv_input().remove_tails();
                 if input.len() > 0 {
                     p.add_str(&s, Some(input));
                 } else {
@@ -204,10 +224,10 @@ impl Commands<'_> {
                 }
             }
         }
-        let debug = p.get_bool("debug");
+        // let debug = p.get_bool("debug");
         loop {
             self.name.to_string().arrow_message();
-            let inputs = recv_input(debug);
+            let inputs = recv_input();
             // println!("inputs: {}", inputs);
             let mut match_command = false;
             if inputs == "list" || inputs == "ls" {
@@ -227,7 +247,7 @@ impl Commands<'_> {
                 match_command = true;
             } else {
                 for m in &self.map {
-                    if inputs == m.long || (inputs == m.short && m.short != "null") {
+                    if inputs == m.long || (inputs == m.short && m.short != NULL) {
                         if m.require_parameters {
                             get_more_parameters(p, &m.parameters, &m.default_value, &m.info_value);
                         }
@@ -247,12 +267,13 @@ impl Commands<'_> {
 
 /* FUNCTION */
 
-fn recv_input(debug: bool) -> String {
+fn recv_input() -> String {
     let mut command = String::new();
-    let b1 = std::io::stdin().read_line(&mut command).unwrap();
-    command.remove_tails().debug_message(debug);
-    let read_bytes = format!("read {} bytes", b1);
-    read_bytes.remove_tails().debug_message(debug);
+    let _ = std::io::stdin().read_line(&mut command).unwrap();
+    // let b1 = std::io::stdin().read_line(&mut command).unwrap();
+    // command.remove_tails().debug_message(debug);
+    // let read_bytes = format!("read {} bytes", b1);
+    // read_bytes.remove_tails().debug_message(debug);
     command.remove_tails()
 }
 
@@ -281,11 +302,10 @@ fn search(p: &mut Parameters) {
 
 fn watchdog(p: &mut Parameters) {
     fn run_filestag(p: &mut Parameters) {
-        let debug = p.get_bool("debug");
         let path = p.get_str("path").unwrap();
         let delay = p.get_str("delay").unwrap();
         let delay: f32 = delay.parse().unwrap();
-        watchdog::filestag::run(&path, debug, delay);
+        watchdog::filestag::run(&path, delay);
     }
 
     let mut commands = Commands::new("watchdog", 1);
@@ -395,7 +415,7 @@ fn honeypot(p: &mut Parameters) {
 fn main() {
     // run backend first
     let args = Args::parse();
-    let debug = args.debug;
+    // let debug = args.debug;
     match args.no_backend {
         false => {
             thread::spawn(|| backend::service::run());
@@ -403,20 +423,25 @@ fn main() {
         _ => (),
     }
 
+    let log = args.log;
+    LOG_FLAG.set(log).unwrap();
+    let verbose = args.verbose;
+    VERBOSE_FLAG.set(verbose).unwrap();
+
     ctrlc::set_handler(move || {
-        "bye~".to_string().info_message();
+        "Bye~".to_string().info_message();
         std::process::exit(0);
     })
     .expect("set ctrlc failed");
 
     let proxy: Option<String> = match args.proxy.as_str() {
-        "null" => None,
+        NULL => None,
         _ => Some(args.proxy.to_string()),
     };
     println!("{}\n{}", WELCOME_INFO.bold().red(), VERSION.bold().green());
     // Parameters
     let mut p = Parameters::new();
-    p.add_bool("debug", debug);
+    // p.add_bool("debug", debug);
     p.add_str("proxy", proxy);
     // Commands
     let mut commands = Commands::new("main", 0);

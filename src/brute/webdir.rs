@@ -132,7 +132,6 @@ pub async fn run(path: &str, target: &str, wordlists: Option<&str>) {
             break;
         }
         let target = target_vec.get(index).unwrap();
-        index += 1;
         let result_200 = match http_get(&target, &url_vec).await {
             Ok(result) => result,
             Err(e) => panic!("Run http_get error: {}", e),
@@ -143,6 +142,7 @@ pub async fn run(path: &str, target: &str, wordlists: Option<&str>) {
         }
         show_result(&result_200);
         target_vec.extend(result_200);
+        index += 1;
     }
     let duration = start.elapsed();
     println!("Exec time: {:?}", duration);
