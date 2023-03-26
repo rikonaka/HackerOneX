@@ -132,11 +132,11 @@ async fn tcp_server() -> Result<(), Box<dyn Error>> {
     let addr = format!("127.0.0.1:{}", DEFAULT_PORT);
 
     let listener = TcpListener::bind(&addr).await?;
-    println!("Backend listening on: {}", addr);
+    let message = format!("Backend listening on: {}", addr);
+    message.info_message();
 
     loop {
         let (mut socket, _) = listener.accept().await?;
-
         // tokio::spawn(async move {
         let mut buf = vec![0; BUFF_SIZE];
         loop {
@@ -185,6 +185,8 @@ pub fn run() {
         Err(e) => {
             let e_str = format!("Running backend service error: {}", e);
             e_str.error_message();
+            let e_str = "If you already run another hackonex process, please try with --no-backend option";
+            e_str.to_string().error_message();
         }
     }
 }

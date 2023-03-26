@@ -53,12 +53,19 @@ trait Message {
     fn log_to_file(&self);
     fn warning_message(&self);
     fn info_message(&self);
+    fn get_info_message(&self) -> String;
     fn error_message(&self);
     fn verbose_message(&self);
     fn remove_tails(&self) -> String;
     fn arrow_message(&self);
     fn invaild_command(&self);
 }
+
+// macro_rules! warning_message {
+//     () => {
+//         warning_message(True)
+//     };
+// }
 
 impl Message for String {
     fn log_to_file(&self) {
@@ -81,20 +88,23 @@ impl Message for String {
     fn warning_message(&self) {
         let message = format!("{} {}", "[warning]".yellow(), self);
         println!("{}", &message);
-        let message = format!("{} {}", "[warning]", self);
-        message.log_to_file()
+        let log_message = format!("{} {}", "[warning]", self);
+        log_message.log_to_file();
     }
     fn info_message(&self) {
         let message = format!("{} {}", "[info]".green(), self);
         println!("{}", &message);
-        let message = format!("{} {}", "[info]", self);
-        message.log_to_file()
+        let log_message = format!("{} {}", "[info]", self);
+        log_message.log_to_file();
+    }
+    fn get_info_message(&self) -> String {
+        format!("{} {}", "[info]".green(), self)
     }
     fn error_message(&self) {
         let message = format!("{} {}", "[error]".red(), self);
         println!("{}", &message);
-        let message = format!("{} {}", "[error]", self);
-        message.log_to_file();
+        let log_message = format!("{} {}", "[error]", self);
+        log_message.log_to_file();
     }
     fn verbose_message(&self) {
         let verbose = VERBOSE_FLAG.get().expect("Get global value failed");
@@ -102,8 +112,8 @@ impl Message for String {
             true => {
                 let message = format!("{} {}", "[verbose]".yellow(), self);
                 println!("{}", message);
-                let message = format!("{} {}", "[verbose]", self);
-                message.log_to_file();
+                let log_message = format!("{} {}", "[verbose]", self);
+                log_message.log_to_file();
             }
             _ => (),
         }
@@ -349,6 +359,11 @@ fn brute(p: &mut Parameters) {
         brute::portscan::run(&target, &port_range, &protocol);
     }
 
+    fn run_hosts(p: &mut Parameters) {
+        let subnet = p.get_str("subnet").unwrap();
+        brute::hosts::run(&subnet);
+    }
+
     let mut commands = Commands::new("brute", 1);
     commands.add(
         "webdir",
@@ -365,8 +380,17 @@ fn brute(p: &mut Parameters) {
         run_portscan,
         true,
         vec!["target", "port_range", "protocol"],
-        vec!["127.0.0.1", "22-1024", "tcp"],
+        vec!["127.0.0.1", "1-1023", "tcp"],
         vec!["port scan target address", "port range", "scan protocol"],
+    );
+    commands.add(
+        "hosts",
+        "hs",
+        run_hosts,
+        true,
+        vec!["subnet"],
+        vec!["192.168.1.0"],
+        vec!["port scan target address"],
     );
     commands.run(p);
 }

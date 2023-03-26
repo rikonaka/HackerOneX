@@ -26,4 +26,6 @@ sqlx = { version = "^0", features = ["runtime-tokio-native-tls" , "json", "chron
 anyhow = "^1"
 http-body-util = "0.1.0-rc.2"
 hyper = { version = "1.0.0-rc.3", features = ["full"] }
-once_cell = "1.17.1"
+once_cell = "^1"
+# surge-ping = { git = "https://github.com/kolapapa/surge-ping", branch = "main" }
+surge-ping = "0.7.3"
