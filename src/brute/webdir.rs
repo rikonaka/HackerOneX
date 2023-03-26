@@ -48,19 +48,6 @@ async fn http_get(
     Ok(success_result)
 }
 
-/*
-fn de_duplication(input: Vec<String>) -> Vec<String> {
-    "de-duplication...".to_string().info();
-    let mut result = Vec::new();
-    for i in input {
-        if !result.contains(&i) {
-            result.push(i);
-        }
-    }
-    result
-}
-*/
-
 fn get_url_from_file(path: &str) -> Vec<String> {
     fn read_lines(filename: String) -> io::Lines<BufReader<File>> {
         // Open the file in read-only mode.
