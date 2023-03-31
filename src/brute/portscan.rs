@@ -56,7 +56,7 @@ pub async fn run(target: &str, port_range: &str, protocol: &str) {
                     pb.update(1);
                 }
                 */
-                let message = "UDP scan is not stable..";
+                let message = "UDP scan is not finish..";
                 message.to_string().warning_message();
             }
             "tcp" | "TCP" => {

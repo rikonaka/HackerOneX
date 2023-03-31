@@ -1,5 +1,4 @@
 use crate::Message;
-use kdam::{tqdm, BarExt};
 use reqwest;
 use std::fs::File;
 use std::io::{self, BufRead, BufReader};
@@ -9,41 +8,22 @@ async fn http_get(
     target: &str,
     url_vec: &Vec<String>,
 ) -> Result<Vec<String>, Box<dyn std::error::Error>> {
-    // let max_line_len = 30;
     let client = reqwest::Client::new();
     let mut success_result: Vec<String> = Vec::new();
-    let mut pb = tqdm!(total = url_vec.len());
     for url in url_vec {
         if url.len() > 0 {
             let new_url = format!("{}{}", target, url);
-            // let new_url_clone = new_url.clone();
-            // println!("{}", &new_url);
+            println!("Scan {}", &new_url);
             let res = client.get(&new_url).send().await?;
-            // windows have some bug
-            // if new_url.len() >= max_line_len {
-            //     pb.set_description(format!("SCAN {}", &new_url[..max_line_len]));
-            // } else {
-            //     for _ in 0..(max_line_len - new_url.len()) {
-            //         new_url = format!("{} ", new_url);
-            //     }
-            //     pb.set_description(format!("SCAN {}", &new_url));
-            // }
             match res.status() {
                 reqwest::StatusCode::OK => {
-                    // println!("{}", message);
-                    pb.write(format!("URL: {} - 200", &new_url.trim()));
+                    println!("URL: {} - 200", &new_url.trim());
                     success_result.push(new_url);
                 }
-                _ => {
-                    // other => {
-                    // let space_str = " ".repeat(100);
-                    // print!("\rURL: {} - {:?}{}", &new_url, other, space_str);
-                    // let message = format!("URL: {} - {:?}", &new_url, other);
-                    // pb.write(message);
-                }
+                _ => (),
             };
         }
-        pb.update(1);
+        // pb.update(1);
     }
     Ok(success_result)
 }
@@ -98,12 +78,6 @@ fn check_target(target: &str) -> String {
     }
 }
 
-fn show_result(input: &Vec<String>) {
-    for i in input {
-        i.info_message();
-    }
-}
-
 // #[tokio::main(worker_threads = 32)]
 #[tokio::main]
 pub async fn run(path: &str, target: &str, wordlists: Option<&str>) {
@@ -113,6 +87,7 @@ pub async fn run(path: &str, target: &str, wordlists: Option<&str>) {
         Some(w) => get_url_from_str(w),
         None => get_url_from_file(path),
     };
+    let mut found_result = Vec::new();
     let mut index = 0;
     loop {
         if index >= target_vec.len() {
@@ -123,14 +98,20 @@ pub async fn run(path: &str, target: &str, wordlists: Option<&str>) {
             Ok(result) => result,
             Err(e) => panic!("Run http_get error: {}", e),
         };
-        println!("{}", result_200.len());
-        if result_200.len() == 0 {
-            break;
+        // println!("{}", result_200.len());
+        if result_200.len() != 0 {
+            for r in &result_200 {
+                found_result.push(r.clone());
+            }
         }
-        show_result(&result_200);
         target_vec.extend(result_200);
         index += 1;
     }
     let duration = start.elapsed();
     println!("Exec time: {:?}", duration);
+
+    for f in found_result {
+        let info = format!("Found {}", f);
+        info.info_message();
+    }
 }
