@@ -1,20 +1,19 @@
 use crate::Message;
-use kdam::{tqdm, BarExt};
 use std::collections::HashMap;
 use std::fs;
 
 use std::convert::Infallible;
 // use std::net::SocketAddr;
-use crate::backend::service::BackendCommand;
 
 use http_body_util::Full;
 use hyper::body::Bytes;
 use hyper::server::conn::http1;
 use hyper::service::service_fn;
 use hyper::{Request, Response};
+use once_cell::sync::OnceCell;
 use tokio::net::TcpListener;
 
-use crate::NULL;
+static URI_MAPS: OnceCell<HashMap<String, String>> = OnceCell::new();
 
 fn read_conf(file_path: &str) -> HashMap<String, String> {
     let contents = fs::read_to_string(file_path).expect("Should have been able to read the file");
@@ -42,7 +41,7 @@ fn read_conf(file_path: &str) -> HashMap<String, String> {
         let lt = l.trim();
         if lt.len() > 0 {
             match lt {
-                "[default-response]" => {
+                "[default]" => {
                     read_default = true;
                 }
                 "[request]" => {
@@ -91,27 +90,13 @@ async fn process_connection(
     // println!("{:?}", req.uri());
     // let maps = read_conf(&config_path);
     let uri = req.uri().to_string();
-    let default_bc =
-        BackendCommand::new(Some("get".to_string()), Some("default".to_string()), None);
-    let bc = BackendCommand::new(Some("get".to_string()), Some(uri), None);
-    let default_response = match default_bc.connect_backend().await {
-        Ok(v) => String::from_utf8_lossy(&v).to_string(),
-        _ => NULL.to_string(),
-    };
-    let response = match bc.connect_backend().await {
-        Ok(v) => {
-            let v_str = String::from_utf8_lossy(&v).to_string();
-            match v_str.as_str() {
-                NULL => default_response,
-                _ => v_str,
-            }
-        }
-        Err(_) => default_response,
+    let maps = URI_MAPS.get().unwrap();
+    let response = match maps.get(&uri) {
+        Some(response) => response.as_str(),
+        _ => maps.get("default").unwrap().as_str(),
     };
     Ok(Response::new(Full::new(Bytes::from(response))))
 }
-
-const HONEYPOT_WEB_CONFIG_PATH: &str = "honeypot_web_config_path";
 
 #[tokio::main]
 async fn web(
@@ -120,36 +105,8 @@ async fn web(
     config: &str,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     // test service
-    let bc = BackendCommand::new(
-        Some("set".to_string()),
-        Some(HONEYPOT_WEB_CONFIG_PATH.to_string()),
-        Some(config.to_string()),
-    );
-    match bc.connect_backend().await {
-        Ok(data) => {
-            let data = String::from_utf8_lossy(&data).to_string();
-            match data.as_str() {
-                "Ok" => (),
-                _ => {
-                    println!("Unknown return: {}", data)
-                }
-            }
-        }
-        Err(e) => println!("{}", e),
-    }
     let maps = read_conf(config);
-    let mut pb = tqdm!(total = maps.keys().len());
-    for k in maps.keys() {
-        let v = maps.get(k).unwrap();
-        let bc = BackendCommand::new(
-            Some("set".to_string()),
-            Some(k.to_string()),
-            Some(v.to_string()),
-        );
-        bc.connect_backend().await.unwrap();
-        pb.set_description(format!("Gen response from file.."));
-        pb.update(1);
-    }
+    URI_MAPS.set(maps).unwrap();
 
     // let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
     let addr = format!("{}:{}", address, port);
@@ -164,7 +121,11 @@ async fn web(
         tokio::task::spawn(async move {
             // Finally, we bind the incoming connection to our `hello` service
             match http1::Builder::new()
-                .serve_connection(stream, service_fn(process_connection))
+                .serve_connection(
+                    stream,
+                    // service_fn(move |req| process_connection(req, inner)),
+                    service_fn(process_connection),
+                )
                 .await
             {
                 Ok(_) => (),

@@ -5,9 +5,7 @@ use once_cell::sync::OnceCell;
 use std::collections::HashMap;
 use std::fs::OpenOptions;
 use std::io::Write;
-use std::thread;
 
-mod backend;
 mod brute;
 mod honeypot;
 mod search;
@@ -38,9 +36,6 @@ struct Args {
     /// Set proxy
     #[arg(short, long, default_value = NULL)] // socks5://127.0.0.1:1080
     proxy: String,
-    /// Do not use backend
-    #[arg(short, long, action)]
-    no_backend: bool,
     /// Log to file
     #[arg(short, long, action)]
     log: bool,
@@ -440,12 +435,6 @@ fn main() {
     // run backend first
     let args = Args::parse();
     // let debug = args.debug;
-    match args.no_backend {
-        false => {
-            thread::spawn(|| backend::service::run());
-        }
-        _ => (),
-    }
 
     let log = args.log;
     LOG_FLAG.set(log).unwrap();

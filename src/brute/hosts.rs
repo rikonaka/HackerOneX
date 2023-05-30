@@ -7,15 +7,15 @@ async fn ping(ipvec: Vec<String>) -> Result<(), Box<dyn std::error::Error>> {
     let payload = [0; 8];
     let mut pb = tqdm!(total = ipvec.len());
     for ip in ipvec {
-        let (_packet, duration) = surge_ping::ping(ip.parse().unwrap(), &payload).await?;
-        let message = format!(
-            "host is alive: {}, seq: {}, time: {:.2?}",
-            ip,
-            _packet.get_sequence(),
-            duration
-        );
-        let info_message = message.get_info_message();
-        pb.write(info_message);
+        // let (_packet, duration) = surge_ping::ping(ip.parse().unwrap(), &payload).await?;
+        // let message = format!(
+        //     "host is alive: {}, seq: {}, time: {:.2?}",
+        //     ip,
+        //     _packet.get_sequence(),
+        //     duration
+        // );
+        // let info_message = message.get_info_message();
+        // pb.write(info_message);
         pb.update(1);
     }
     Ok(())
