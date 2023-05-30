@@ -1,38 +1,24 @@
 use kdam::{tqdm, BarExt};
-use surge_ping::IcmpPacket;
 
 use crate::Message;
 
 #[tokio::main]
-async fn ping(ipvec: Vec<String>) {
+async fn ping(ipvec: Vec<String>) -> Result<(), Box<dyn std::error::Error>> {
+    let payload = [0; 8];
     let mut pb = tqdm!(total = ipvec.len());
     for ip in ipvec {
-        match surge_ping::ping(ip.parse().unwrap(), &[0]).await {
-            Ok((IcmpPacket::V4(packet), duration)) => {
-                // println!(
-                //     "{} bytes from {}: icmp_seq={} ttl={:?} time={:.2?}",
-                //     packet.get_size(),
-                //     packet.get_source(),
-                //     packet.get_sequence(),
-                //     packet.get_ttl(),
-                //     duration
-                // );
-                let message = format!(
-                    "host is alive: {}, ttl: {}, time: {:.2?}",
-                    ip,
-                    packet.get_ttl(),
-                    duration
-                );
-                let info_message = message.get_info_message();
-                pb.write(info_message);
-            }
-            Ok(_) => {
-                // unreachable!();
-            }
-            Err(e) => println!("{:?}", e),
-        };
+        let (_packet, duration) = surge_ping::ping(ip.parse().unwrap(), &payload).await?;
+        let message = format!(
+            "host is alive: {}, seq: {}, time: {:.2?}",
+            ip,
+            _packet.get_sequence(),
+            duration
+        );
+        let info_message = message.get_info_message();
+        pb.write(info_message);
         pb.update(1);
     }
+    Ok(())
 }
 
 fn subnet_error(subnet: &str) {
@@ -56,8 +42,8 @@ pub fn run(subnet: &str) {
                 );
                 ipvec.push(ip);
             }
-            println!("{:?}", ipvec);
-            ping(ipvec);
+            // #println!("{:?}", ipvec);
+            ping(ipvec).unwrap();
         } else {
             subnet_error(subnet);
         }
