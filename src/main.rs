@@ -3,8 +3,11 @@ use clap::Parser;
 use colored::Colorize;
 use once_cell::sync::OnceCell;
 use std::collections::HashMap;
+use std::env;
 use std::fs::OpenOptions;
 use std::io::Write;
+use std::path::Path;
+use std::process::Command;
 
 mod brute;
 mod honeypot;
@@ -15,7 +18,7 @@ mod watchdog;
 static LOG_FLAG: OnceCell<bool> = OnceCell::new();
 static VERBOSE_FLAG: OnceCell<bool> = OnceCell::new();
 
-const NULL: &str = "null";
+const NULL_VALUE: &str = "null";
 
 const VERSION: &str = "v0.2.0";
 
@@ -34,11 +37,20 @@ const WELCOME_INFO: &str = r"
 #[command(author, version, about, long_about = None)]
 struct Args {
     /// Set proxy
-    #[arg(short, long, default_value = NULL)] // socks5://127.0.0.1:1080
+    #[arg(short, long, default_value = NULL_VALUE)] // socks5://127.0.0.1:1080
     proxy: String,
     /// Log to file
     #[arg(short, long, action)]
     log: bool,
+    /// Level 0 command
+    #[arg(long, action)]
+    level0: String,
+    /// Level 1 command
+    #[arg(long, action)]
+    level1: String,
+    /// Level 2 command
+    #[arg(long, action)]
+    level2: String,
     /// Set in verbose mode
     #[arg(short, long, action)]
     verbose: bool,
@@ -51,7 +63,6 @@ trait Message {
     fn get_info_message(&self) -> String;
     fn error_message(&self);
     fn verbose_message(&self);
-    fn remove_tails(&self) -> String;
     fn arrow_message(&self);
     fn invaild_command(&self);
 }
@@ -113,9 +124,6 @@ impl Message for String {
             _ => (),
         }
     }
-    fn remove_tails(&self) -> String {
-        self.trim().to_string()
-    }
     fn arrow_message(&self) {
         let date = Local::now();
         let date_str = date.format("%Y-%m-%d %H:%M:%S");
@@ -161,7 +169,7 @@ struct CommandsMap {
 struct Commands<'a> {
     name: &'a str,
     level: usize,
-    map: Vec<CommandsMap>,
+    commandsmap: Vec<CommandsMap>,
 }
 
 impl Commands<'_> {
@@ -169,7 +177,7 @@ impl Commands<'_> {
         Commands {
             name,
             level,
-            map: Vec::new(),
+            commandsmap: Vec::new(),
         }
     }
     fn add(
@@ -179,12 +187,12 @@ impl Commands<'_> {
         f: fn(&mut Parameters),
         require_parameters: bool,
         parameters: Vec<&str>,
-        default_value: Vec<&str>,
+        default_parameters: Vec<&str>,
         info_value: Vec<&str>,
     ) {
-        if (parameters.len() != default_value.len())
+        if (parameters.len() != default_parameters.len())
             | (parameters.len() != info_value.len())
-            | (default_value.len() != info_value.len())
+            | (default_parameters.len() != info_value.len())
         {
             let e_str = "Commands add parameters should has same length".to_string();
             e_str.error_message();
@@ -196,15 +204,18 @@ impl Commands<'_> {
             f,
             require_parameters,
             parameters: parameters.into_iter().map(|s| s.to_string()).collect(),
-            default_value: default_value.into_iter().map(|s| s.to_string()).collect(),
+            default_value: default_parameters
+                .into_iter()
+                .map(|s| s.to_string())
+                .collect(),
             info_value: info_value.into_iter().map(|s| s.to_string()).collect(),
         };
-        self.map.push(map);
+        self.commandsmap.push(map);
     }
     fn menu(&self) {
         // println!("{}", self.map.len());
-        for m in &self.map {
-            println!("> {}({})", m.long.red(), m.short.red());
+        for map in &self.commandsmap {
+            println!("> {}({})", map.long.red(), map.short.red());
         }
     }
     fn run(&self, p: &mut Parameters) {
@@ -221,7 +232,7 @@ impl Commands<'_> {
                     s, &info_vec[i], &default_vec[i]
                 );
                 println!("{}", info_str.green());
-                let input = recv_input().remove_tails();
+                let input = recv_input();
                 if input.len() > 0 {
                     p.add_str(&s, Some(input));
                 } else {
@@ -248,15 +259,20 @@ impl Commands<'_> {
                         .to_string()
                         .warning_message();
                 }
-            } else if inputs.remove_tails().len() == 0 {
+            } else if inputs.trim().len() == 0 {
                 match_command = true;
             } else {
-                for m in &self.map {
-                    if inputs == m.long || (inputs == m.short && m.short != NULL) {
-                        if m.require_parameters {
-                            get_more_parameters(p, &m.parameters, &m.default_value, &m.info_value);
+                for map in &self.commandsmap {
+                    if inputs == map.long || (inputs == map.short && map.short != NULL_VALUE) {
+                        if map.require_parameters {
+                            get_more_parameters(
+                                p,
+                                &map.parameters,
+                                &map.default_value,
+                                &map.info_value,
+                            );
                         }
-                        (m.f)(p);
+                        (map.f)(p);
                         match_command = true;
                     } else {
                     }
@@ -279,7 +295,7 @@ fn recv_input() -> String {
     // command.remove_tails().debug_message(debug);
     // let read_bytes = format!("read {} bytes", b1);
     // read_bytes.remove_tails().debug_message(debug);
-    command.remove_tails()
+    command.trim().to_string()
 }
 
 fn search(p: &mut Parameters) {
@@ -431,63 +447,57 @@ fn honeypot(p: &mut Parameters) {
     commands.run(p);
 }
 
-#[test]
-fn test_raw_socket() {
-    use pnet::datalink::Channel::Ethernet;
-    use pnet::datalink::{self, NetworkInterface};
-    use pnet::packet::ethernet::{EthernetPacket, MutableEthernetPacket};
-    use pnet::packet::{MutablePacket, Packet};
-
-    let interface_name = String::from("eno1");
-    let interface_names_match = |iface: &NetworkInterface| iface.name == interface_name;
-    println!("{}", interface_name);
-
-    // Find the network interface with the provided name
-    let interfaces = datalink::interfaces();
-    println!("{:?}", interfaces);
-    let interface = interfaces
-        .into_iter()
-        .filter(interface_names_match)
-        .next()
-        .unwrap();
-
-    // Create a new channel, dealing with layer 2 packets
-    let (mut tx, mut rx) = match datalink::channel(&interface, Default::default()) {
-        Ok(Ethernet(tx, rx)) => (tx, rx),
-        Ok(_) => panic!("Unhandled channel type"),
-        Err(e) => panic!(
-            "An error occurred when creating the datalink channel: {}",
-            e
-        ),
-    };
-
+fn shell(_: &mut Parameters) {
     loop {
-        match rx.next() {
-            Ok(packet) => {
-                let packet = EthernetPacket::new(packet).unwrap();
-
-                // Constructs a single packet, the same length as the the one received,
-                // using the provided closure. This allows the packet to be constructed
-                // directly in the write buffer, without copying. If copying is not a
-                // problem, you could also use send_to.
-                //
-                // The packet is sent once the closure has finished executing.
-                tx.build_and_send(1, packet.packet().len(), &mut |mut new_packet| {
-                    let mut new_packet = MutableEthernetPacket::new(new_packet).unwrap();
-
-                    // Create a clone of the original packet
-                    new_packet.clone_from(&packet);
-
-                    // Switch the source and destination
-                    new_packet.set_source(packet.get_destination());
-                    new_packet.set_destination(packet.get_source());
-                });
+        // let dir_now = env::current_dir().unwrap();
+        // println!("{}", dir_now.display());
+        String::from("shell").arrow_message();
+        let user_input = recv_input();
+        let user_input_char: Vec<char> = user_input.chars().collect();
+        if user_input_char.len() >= 3
+            && user_input_char[0] == 'c'
+            && user_input_char[1] == 'd'
+            && user_input_char[2] == ' '
+        {
+            let user_input_split: Vec<&str> = user_input.split(" ").collect();
+            if user_input_split.len() >= 2 {
+                let new_path = Path::new(user_input_split[1]);
+                env::set_current_dir(new_path).unwrap();
             }
-            Err(e) => {
-                // If an error occurs, we can handle it here
-                panic!("An error occurred while reading: {}", e);
-            }
+        } else if (user_input_char.len() == 1 && user_input_char[0] == 'b')
+            || (user_input_char.len() == 4
+                && user_input_char[0] == 'b'
+                && user_input_char[1] == 'a'
+                && user_input_char[2] == 'c'
+                && user_input_char[3] == 'k')
+        {
+            String::from("exit shell mode...").info_message();
+            break;
         }
+
+        let output = if cfg!(target_os = "windows") {
+            match Command::new("pwsh").arg("/C").arg(user_input).output() {
+                Ok(o) => o,
+                Err(e) => {
+                    println!("{}", e);
+                    continue;
+                }
+            }
+        } else if cfg!(target_os = "linux") {
+            match Command::new("sh").arg("-c").arg(user_input).output() {
+                Ok(o) => o,
+                Err(e) => {
+                    println!("{}", e);
+                    continue;
+                }
+            }
+        } else {
+            let err = String::from("unsupport os");
+            err.error_message();
+            panic!("{}", err);
+        };
+        let output_str = String::from_utf8_lossy(&output.stdout);
+        println!("{}", output_str);
     }
 }
 
@@ -502,13 +512,13 @@ fn main() {
     VERBOSE_FLAG.set(verbose).unwrap();
 
     ctrlc::set_handler(move || {
-        "Bye~".to_string().info_message();
+        "bye~".to_string().info_message();
         std::process::exit(0);
     })
     .expect("set ctrlc failed");
 
     let proxy: Option<String> = match args.proxy.as_str() {
-        NULL => None,
+        NULL_VALUE => None,
         _ => Some(args.proxy.to_string()),
     };
     println!("{}\n{}", WELCOME_INFO.bold().red(), VERSION.bold().green());
@@ -523,5 +533,6 @@ fn main() {
     commands.add("brute", "bt", brute, false, vec![], vec![], vec![]);
     commands.add("sqltools", "st", sqltools, false, vec![], vec![], vec![]);
     commands.add("honeypot", "hp", honeypot, false, vec![], vec![], vec![]);
+    commands.add("shell", "sh", shell, false, vec![], vec![], vec![]);
     commands.run(&mut p);
 }

@@ -7,7 +7,7 @@ use std::{fs, thread, time};
 use walkdir::WalkDir;
 
 use crate::Message;
-use crate::NULL;
+use crate::NULL_VALUE;
 use crate::VERBOSE_FLAG;
 
 const DBFILE: &str = "filestag.db";
@@ -161,7 +161,7 @@ fn reverse(db: &Database, watchpath: &str) {
         let path = &df[0];
         if !all_files_v.contains(path) && last_opt != "deleted" {
             let log_str = format!("Some file deleted: {}", path);
-            let null = String::from(NULL);
+            let null = String::from(NULL_VALUE);
             let last_opt = String::from("deleted");
             db.update(path, &null, &null, &last_opt);
             // log_to_file(&log_str);

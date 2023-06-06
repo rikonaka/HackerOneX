@@ -13,7 +13,8 @@ use sqlx::{MySqlConnection, PgConnection};
 use std::collections::HashMap;
 // use std::error::Error;
 
-use crate::NULL;
+use crate::recv_input;
+use crate::NULL_VALUE;
 
 struct SqlRow {
     max_len: usize,
@@ -29,10 +30,10 @@ impl SqlRow {
         let value = if self.row.contains_key(col_name) {
             match self.row.get(col_name) {
                 Some(v) => v.to_string(),
-                None => format!("[{}]", NULL),
+                None => format!("[{}]", NULL_VALUE),
             }
         } else {
-            format!("[{}]", NULL)
+            format!("[{}]", NULL_VALUE)
         };
         value
     }
@@ -136,16 +137,6 @@ impl SqlDatas {
 fn unsupported_type(name: &str) {
     let e_str = format!("Unsupported type: {}", name);
     e_str.warning_message();
-}
-
-fn recv_input() -> String {
-    let mut command = String::new();
-    "Please input a sql statement:".to_string().info_message();
-    let _ = std::io::stdin().read_line(&mut command).unwrap();
-    // let b1 = std::io::stdin().read_line(&mut command).unwrap();
-    // let read_bytes = format!("read {} bytes", b1);
-    // read_bytes.remove_tails().debug_message(debug);
-    command.remove_tails()
 }
 
 async fn mysql_query(conn: &mut MySqlConnection, sql: &str) -> anyhow::Result<()> {
