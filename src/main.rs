@@ -370,9 +370,9 @@ fn brute(p: &mut Parameters) {
         brute::portscan::run(&target, &port_range, &protocol);
     }
 
-    fn run_hosts(p: &mut Parameters) {
+    fn run_arpscan(p: &mut Parameters) {
         let subnet = p.get_str("subnet").unwrap();
-        brute::hosts::run(&subnet);
+        brute::arpscan::run(&subnet);
     }
 
     let mut commands = Commands::new("brute", 1);
@@ -395,13 +395,13 @@ fn brute(p: &mut Parameters) {
         vec!["port scan target address", "port range", "scan protocol"],
     );
     commands.add(
-        "hosts",
-        "hs",
-        run_hosts,
+        "arpscan",
+        "as",
+        run_arpscan,
         true,
         vec!["subnet"],
-        vec!["192.168.1.0"],
-        vec!["port scan target address"],
+        vec!["192.168.1.0/24"],
+        vec!["arp scan target subnet"],
     );
     commands.run(p);
 }
