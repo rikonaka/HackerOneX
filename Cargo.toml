@@ -28,3 +28,4 @@ http-body-util = "0.1.0-rc.2"
 hyper = { version = "1.0.0-rc.3", features = ["full"] }
 once_cell = "^1"
 pnet = "^0"
+subnetwork = "0.1.1"

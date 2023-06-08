@@ -37,19 +37,19 @@ const WELCOME_INFO: &str = r"
 #[command(author, version, about, long_about = None)]
 struct Args {
     /// Set proxy
-    #[arg(short, long, default_value = NULL_VALUE)] // socks5://127.0.0.1:1080
+    #[arg(short, long, default_value=NULL_VALUE)] // socks5://127.0.0.1:1080
     proxy: String,
     /// Log to file
     #[arg(short, long, action)]
     log: bool,
     /// Level 0 command
-    #[arg(long, action)]
+    #[arg(long, default_value=NULL_VALUE)]
     level0: String,
     /// Level 1 command
-    #[arg(long, action)]
+    #[arg(long, default_value=NULL_VALUE)]
     level1: String,
     /// Level 2 command
-    #[arg(long, action)]
+    #[arg(long, default_value=NULL_VALUE)]
     level2: String,
     /// Set in verbose mode
     #[arg(short, long, action)]
@@ -372,7 +372,8 @@ fn brute(p: &mut Parameters) {
 
     fn run_arpscan(p: &mut Parameters) {
         let subnet = p.get_str("subnet").unwrap();
-        brute::arpscan::run(&subnet);
+        let interface = p.get_str("interface").unwrap();
+        brute::arpscan::run(&subnet, &interface);
     }
 
     let mut commands = Commands::new("brute", 1);
@@ -399,9 +400,9 @@ fn brute(p: &mut Parameters) {
         "as",
         run_arpscan,
         true,
-        vec!["subnet"],
-        vec!["192.168.1.0/24"],
-        vec!["arp scan target subnet"],
+        vec!["subnet", "interface"],
+        vec!["192.168.1.0/24", "eno1"],
+        vec!["arp scan target subnet", "arp scan interface"],
     );
     commands.run(p);
 }

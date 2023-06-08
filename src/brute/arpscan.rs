@@ -1,14 +1,12 @@
-use std::env;
-use std::io::{self, Write};
-use std::net::{AddrParseError, IpAddr, Ipv4Addr};
-use std::process;
-
+use std::net::{Ipv4Addr, IpAddr};
+use subnetwork;
 use pnet::datalink::{Channel, MacAddr, NetworkInterface};
-
 use pnet::packet::arp::{ArpHardwareTypes, ArpOperations, ArpPacket, MutableArpPacket};
 use pnet::packet::ethernet::EtherTypes;
 use pnet::packet::ethernet::MutableEthernetPacket;
 use pnet::packet::{MutablePacket, Packet};
+
+use crate::Message;
 
 fn get_mac_through_arp(interface: NetworkInterface, target_ip: Ipv4Addr) -> MacAddr {
     let source_ip = interface
@@ -68,31 +66,7 @@ fn get_mac_through_arp(interface: NetworkInterface, target_ip: Ipv4Addr) -> MacA
     panic!("Never reach here")
 }
 
-fn main() {
-    let mut args = env::args().skip(1);
-    let iface_name = match args.next() {
-        Some(n) => n,
-        None => {
-            writeln!(
-                io::stderr(),
-                "USAGE: arp_packet <NETWORK INTERFACE> <TARGET IP>"
-            )
-            .unwrap();
-            process::exit(1);
-        }
-    };
-
-    let target_ip: Result<Ipv4Addr, AddrParseError> = match args.next() {
-        Some(n) => n.parse(),
-        None => {
-            writeln!(
-                io::stderr(),
-                "USAGE: arp_packet <NETWORK INTERFACE> <TARGET IP>"
-            )
-            .unwrap();
-            process::exit(1);
-        }
-    };
+fn scan(target_ip: Ipv4Addr, iface_name: &str) {
 
     let interfaces = pnet::datalink::interfaces();
     let interface = interfaces
@@ -101,13 +75,24 @@ fn main() {
         .unwrap();
     let _source_mac = interface.mac.unwrap();
 
-    let target_mac = get_mac_through_arp(interface, target_ip.unwrap());
-
+    let target_mac = get_mac_through_arp(interface, target_ip);
     println!("Target MAC address: {}", target_mac);
 }
 
-pub fn run(subnet: &str) {
+pub fn run(subnet: &str, interface: &str) {
     // subnet: 192.168.1.0/24
-    let subnet_ipv4: Ipv4Addr = subnet.parse().unwrap();
-    let subnet_oct = subnet_ipv4.octets();
+    if subnet.contains("/") {
+        let subnet_vec: Vec<&str> = subnet.split("/").collect();
+        if subnet_vec.len() == 2 {
+            let address = subnet_vec[0];
+            let prefix: usize = subnet_vec[1].parse().unwrap();
+            let ipv4_iter = subnetwork::ipv4_iter(address, prefix).unwrap();
+            for ip in ipv4_iter {
+                scan(ip, interface);
+            }
+            return
+        }
+    }
+    let err = "subnet should like 192.16.1.0/24".to_string();
+    err.error_message();
 }
