@@ -1,14 +1,16 @@
-use std::net::{Ipv4Addr, IpAddr};
-use subnetwork;
 use pnet::datalink::{Channel, MacAddr, NetworkInterface};
 use pnet::packet::arp::{ArpHardwareTypes, ArpOperations, ArpPacket, MutableArpPacket};
 use pnet::packet::ethernet::EtherTypes;
 use pnet::packet::ethernet::MutableEthernetPacket;
 use pnet::packet::{MutablePacket, Packet};
+use std::net::{IpAddr, Ipv4Addr};
+use subnetwork;
+// use once_cell::sync::OnceCell;
+// static ALIVE_HOSTS: OnceCell<Vec<Vec<String>>> = OnceCell::new();
 
 use crate::Message;
 
-fn get_mac_through_arp(interface: NetworkInterface, target_ip: Ipv4Addr) -> MacAddr {
+fn get_mac_through_arp(interface: NetworkInterface, target_ip: Ipv4Addr) -> Option<MacAddr> {
     let source_ip = interface
         .ips
         .iter()
@@ -52,22 +54,20 @@ fn get_mac_through_arp(interface: NetworkInterface, target_ip: Ipv4Addr) -> MacA
         .unwrap()
         .unwrap();
 
-    println!("Sent ARP request");
-
-    while let buf = receiver.next().unwrap() {
+    for _ in 0..10 {
+        let buf = receiver.next().unwrap();
         let arp = ArpPacket::new(&buf[MutableEthernetPacket::minimum_packet_size()..]).unwrap();
         if arp.get_sender_proto_addr() == target_ip
             && arp.get_target_hw_addr() == interface.mac.unwrap()
         {
-            println!("Received reply");
-            return arp.get_sender_hw_addr();
+            // println!("Received reply");
+            return Some(arp.get_sender_hw_addr());
         }
     }
-    panic!("Never reach here")
+    None
 }
 
-fn scan(target_ip: Ipv4Addr, iface_name: &str) {
-
+async fn scan(target_ip: Ipv4Addr, iface_name: &str) {
     let interfaces = pnet::datalink::interfaces();
     let interface = interfaces
         .into_iter()
@@ -75,11 +75,20 @@ fn scan(target_ip: Ipv4Addr, iface_name: &str) {
         .unwrap();
     let _source_mac = interface.mac.unwrap();
 
-    let target_mac = get_mac_through_arp(interface, target_ip);
-    println!("Target MAC address: {}", target_mac);
+    tokio::spawn(async move {
+        let target_mac = get_mac_through_arp(interface, target_ip);
+        match target_mac {
+            Some(target_mac) => {
+                println!("{} MAC address: {}", target_ip, target_mac);
+            }
+            _ => (),
+        }
+    });
 }
 
-pub fn run(subnet: &str, interface: &str) {
+
+#[tokio::main]
+pub async fn run(subnet: &str, interface: &str) {
     // subnet: 192.168.1.0/24
     if subnet.contains("/") {
         let subnet_vec: Vec<&str> = subnet.split("/").collect();
@@ -88,9 +97,9 @@ pub fn run(subnet: &str, interface: &str) {
             let prefix: usize = subnet_vec[1].parse().unwrap();
             let ipv4_iter = subnetwork::ipv4_iter(address, prefix).unwrap();
             for ip in ipv4_iter {
-                scan(ip, interface);
+                scan(ip, interface).await;
             }
-            return
+            return;
         }
     }
     let err = "subnet should like 192.16.1.0/24".to_string();
