@@ -79,7 +79,7 @@ async fn scan(target_ip: Ipv4Addr, iface_name: &str) {
         let target_mac = get_mac_through_arp(interface, target_ip);
         match target_mac {
             Some(target_mac) => {
-                println!("{} MAC address: {}", target_ip, target_mac);
+                println!("{} => {}", target_ip, target_mac);
             }
             _ => (),
         }
