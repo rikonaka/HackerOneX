@@ -5,8 +5,8 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
-[target.'cfg(target_os = "linux")'.dependencies]
-openssl = { version = "0.10", features = ["vendored"] }
+# [target.'cfg(target_os = "linux")'.dependencies]
+# openssl = { version = "0.10", features = ["vendored"] }
 
 [dependencies]
 reqwest = { version = "^0", features = ["json", "socks"] }
