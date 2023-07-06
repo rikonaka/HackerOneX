@@ -4,7 +4,7 @@ use pnet::packet::ethernet::EtherTypes;
 use pnet::packet::ethernet::MutableEthernetPacket;
 use pnet::packet::{MutablePacket, Packet};
 use std::net::{IpAddr, Ipv4Addr};
-use subnetwork;
+use subnetwork::Ipv4Pool;
 // use once_cell::sync::OnceCell;
 // static ALIVE_HOSTS: OnceCell<Vec<Vec<String>>> = OnceCell::new();
 
@@ -89,17 +89,11 @@ async fn scan(target_ip: Ipv4Addr, iface_name: &str) {
 
 #[tokio::main]
 pub async fn run(subnet: &str, interface: &str) {
-    // subnet: 192.168.1.0/24
     if subnet.contains("/") {
-        let subnet_vec: Vec<&str> = subnet.split("/").collect();
-        if subnet_vec.len() == 2 {
-            let address = subnet_vec[0];
-            let prefix: usize = subnet_vec[1].parse().unwrap();
-            let ipv4_iter = subnetwork::ipv4_iter(address, prefix).unwrap();
-            for ip in ipv4_iter {
-                scan(ip, interface).await;
-            }
-            return;
+        // 192.168.1.0/24
+        let ipv4_iter = Ipv4Pool::new(subnet).unwrap();
+        for ip in ipv4_iter {
+            scan(ip, interface).await;
         }
     }
     let err = "subnet should like 192.16.1.0/24".to_string();
