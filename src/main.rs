@@ -5,6 +5,8 @@ mod errors;
 mod scan;
 mod utils;
 
+use crate::scan::ScanMethods;
+
 const WELCOME_INFO: &str = r"
   _    _            _              ____            __   __
  | |  | |          | |            / __ \           \ \ / /
@@ -20,6 +22,16 @@ struct Args {
     /// SYN port scanning
     #[arg(long = "sps", action)]
     sysportscan: bool,
+    /// ACK port scanning
+    #[arg(long = "aps", action)]
+    ackportscan: bool,
+    /// CONNECT port scanning
+    #[arg(long = "cps", action)]
+    conportscan: bool,
+    /// FIN port scanning
+    #[arg(long = "fps", action)]
+    finportscan: bool,
+
     /// Target addr
     #[arg(long = "ta", default_value = "")]
     targetaddr: String,
@@ -46,11 +58,36 @@ fn main() -> Result<()> {
     let welcome_info = format!("{} v{}\n", WELCOME_INFO, version);
     println!("{}", welcome_info);
     if args.sysportscan {
-        scan::sysportscan(
+        scan::portscan(
             &args.targetaddr,
             &args.targetport,
             args.threadsnum,
             args.timeout,
+            ScanMethods::SYN,
+        )?;
+    } else if args.ackportscan {
+        scan::portscan(
+            &args.targetaddr,
+            &args.targetport,
+            args.threadsnum,
+            args.timeout,
+            ScanMethods::ACK,
+        )?;
+    } else if args.conportscan {
+        scan::portscan(
+            &args.targetaddr,
+            &args.targetport,
+            args.threadsnum,
+            args.timeout,
+            ScanMethods::CON,
+        )?;
+    } else if args.finportscan {
+        scan::portscan(
+            &args.targetaddr,
+            &args.targetport,
+            args.threadsnum,
+            args.timeout,
+            ScanMethods::FIN,
         )?;
     }
 
