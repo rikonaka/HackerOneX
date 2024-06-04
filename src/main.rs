@@ -1,8 +1,9 @@
+use anyhow::Result;
 use clap::Parser;
 
+mod errors;
 mod scan;
 mod utils;
-mod errors;
 
 const WELCOME_INFO: &str = r"
   _    _            _              ____            __   __
@@ -19,11 +20,17 @@ struct Args {
     /// SYN port scanning
     #[arg(long = "sps", action)]
     sysportscan: bool,
+    /// Target addr
+    #[arg(long = "ta", default_value = "")]
+    targetaddr: String,
+    /// Target port
+    #[arg(long = "tp", default_value = "")]
+    targetport: String,
     /// Threads number
-    #[arg(short, long, default_value_t = 8)]
+    #[arg(long = "tn", default_value_t = 8)]
     threadsnum: usize,
     /// The timeout for all network work
-    #[arg(short, long, default_value_t = 1.0)]
+    #[arg(long, default_value_t = 1.0)]
     timeout: f32,
     /// Log to file
     #[arg(short, long, action)]
@@ -33,10 +40,19 @@ struct Args {
     verbose: bool,
 }
 
-fn main() {
+fn main() -> Result<()> {
     let args = Args::parse();
     let version = env!("CARGO_PKG_VERSION");
     let welcome_info = format!("{} v{}\n", WELCOME_INFO, version);
     println!("{}", welcome_info);
-    if args.sysportscan {}
+    if args.sysportscan {
+        scan::sysportscan(
+            &args.targetaddr,
+            &args.targetport,
+            args.threadsnum,
+            args.timeout,
+        )?;
+    }
+
+    Ok(())
 }

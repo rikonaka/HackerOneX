@@ -148,12 +148,17 @@ pub fn target_addr_parser(addr_str: &str) -> Result<Vec<IpAddr>> {
     Ok(ret)
 }
 
-/// Legal port format:
-/// 80-90
-/// 80,81
-pub fn target_port_parser(port_str: &str) -> Result<Vec<u16>> {
-    let mut ret = Vec::new();
+fn port_is_range(port_str: &str) -> bool {
     if port_str.contains("-") {
+        true
+    } else {
+        false
+    }
+}
+
+fn port_parser(port_str: &str) -> Result<Vec<u16>> {
+    let mut ret = Vec::new();
+    if port_is_range(port_str) {
         // range port
         let port_split: Vec<&str> = port_str.split("-").collect();
         if port_split.len() == 2 {
@@ -165,7 +170,28 @@ pub fn target_port_parser(port_str: &str) -> Result<Vec<u16>> {
                 }
             }
         }
-    } else if port_str.contains(",") {
+    } else {
+        // single port
+        let port: u16 = port_str.parse()?;
+        ret.push(port);
+    }
+    Ok(ret)
+}
+
+/// Legal port format:
+/// 80-90
+/// 80,81
+pub fn target_port_parser(port_str: &str) -> Result<Vec<u16>> {
+    let mut ret = Vec::new();
+    if port_str.contains(",") {
+        let port_split: Vec<&str> = port_str.split(",").collect();
+        for p in port_split {
+            let r = port_parser(p)?;
+            ret.extend(r);
+        }
+    } else {
+        let r = port_parser(port_str)?;
+        ret.extend(r);
     }
     Ok(ret)
 }
@@ -187,6 +213,14 @@ mod tests {
         for addr in addr_vec {
             let _r = target_addr_parser(addr).unwrap();
             // println!("{:?}", _r);
+        }
+    }
+    #[test]
+    fn test_target_port_parser() {
+        let port_vec = vec!["80", "80,91", "80,91-100"];
+        for port in port_vec {
+            let _r = target_port_parser(port).unwrap();
+            println!("{:?}", _r);
         }
     }
 }
