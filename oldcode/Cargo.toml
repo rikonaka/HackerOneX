@@ -1,0 +1,31 @@
+[package]
+name = "hackeronex"
+version = "0.2.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+# [target.'cfg(target_os = "linux")'.dependencies]
+# openssl = { version = "0.10", features = ["vendored"] }
+
+[dependencies]
+reqwest = { version = "^0", features = ["json", "socks"] }
+tokio = { version = "^1", features = ["full"] }
+serde = { version = "^1", features = ["derive"] }
+serde_json = "^1"
+clap = { version = "^4", features = ["derive"] }
+ctrlc = { version = "^3", features = ["termination"] }
+walkdir = "^2"
+md5 = "^0"
+rust-crypto = "^0"
+sqlite = "^0"
+chrono = "^0"
+colored = "^2"
+kdam = { version = "^0", features = ["gradient", "template"] }
+http-body-util = "0.1.0-rc.2"
+hyper = { version = "1.0.0-rc.3", features = ["full"] }
+once_cell = "^1"
+pnet = "^0"
+anyhow = "^1"
+subnetwork = "^0"
+rssql = "^0"
