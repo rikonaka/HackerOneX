@@ -18,7 +18,7 @@ fn addr_is_ipv4(addr_str: &str) -> bool {
     }
 }
 
-fn addr_is_ipv6(addr_str: &str) -> bool {
+pub fn addr_is_ipv6(addr_str: &str) -> bool {
     !addr_is_ipv4(addr_str)
 }
 

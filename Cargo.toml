@@ -9,4 +9,5 @@ edition = "2021"
 anyhow = "^1"
 clap = { version = "^4", features = ["derive"] }
 pistol = "^1"
+rand = "^0"
 subnetwork = "^0"
